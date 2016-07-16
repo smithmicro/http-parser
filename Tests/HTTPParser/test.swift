@@ -18,138 +18,142 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-#include "http_parser.h"
-#include <stdlib.h>
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h> /* rand */
-#include <string.h>
-#include <stdarg.h>
 
-#if defined(__APPLE__)
-# undef strlcat
-# undef strlncpy
-# undef strlcpy
-#endif  /* defined(__APPLE__) */
+/*
+ Swift 3 port
+ Copyright (c) 2016 Dave Sperling - Smith Micro Software, Inc.
+ */
 
-#undef TRUE
-#define TRUE 1
-#undef FALSE
-#define FALSE 0
+import Foundation
 
-#define MAX_HEADERS 13
-#define MAX_ELEMENT_SIZE 2048
-#define MAX_CHUNKS 16
+@testable import HTTPParser
+import XCTest
 
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
+let MAX_HEADERS = 13
+let MAX_ELEMENT_SIZE = 2048
+let MAX_CHUNKS = 16
 
-static http_parser *parser;
+
+var parser: http_parser? = nil
+
+func HTTP_PARSER_ERRNO(_ p: http_parser?) -> http_errno {
+  return p!.http_errno
+}
 
 struct message {
-  const char *name; // for debugging purposes
-  const char *raw;
-  enum http_parser_type type;
-  enum http_method method;
-  int status_code;
-  char response_status[MAX_ELEMENT_SIZE];
-  char request_path[MAX_ELEMENT_SIZE];
-  char request_url[MAX_ELEMENT_SIZE];
-  char fragment[MAX_ELEMENT_SIZE];
-  char query_string[MAX_ELEMENT_SIZE];
-  char body[MAX_ELEMENT_SIZE];
-  size_t body_size;
-  const char *host;
-  const char *userinfo;
-  uint16_t port;
-  int num_headers;
-  enum { NONE=0, FIELD, VALUE } last_header_element;
-  char headers [MAX_HEADERS][2][MAX_ELEMENT_SIZE];
-  int should_keep_alive;
+  var name = "" // for debugging purposes
+  var type:http_parser_type = .HTTP_REQUEST
+  var raw = ""
+  //var status_code = 0
+  //var response_status = ""
+  //var body_size = 0
+  //var host = ""
+  //var userinfo = ""
+  //var port:UInt16 = 0
+  enum last_header_element:Int { case NONE = 0, FIELD, VALUE }
+  var should_keep_alive: Bool
 
-  int num_chunks;
-  int num_chunks_complete;
-  int chunk_lengths[MAX_CHUNKS];
+  //var num_chunks = 0
+  //var num_chunks_complete = 0
+  //var chunk_lengths = [Int]()    // MAX_CHUNKS
 
-  const char *upgrade; // upgraded body
+  //var upgrade = "" // upgraded body
 
-  unsigned short http_major;
-  unsigned short http_minor;
+  var message_complete_on_eof: Bool = false
+  var http_major:UInt16 = 0
+  var http_minor:UInt16 = 0
+  var method: http_method = .HTTP_GET
+  var query_string = ""
+  var fragment = ""
+  var request_path = ""
+  var request_url = ""
+  var num_headers = 0
+  var headers = [[String:String]]()
+  var body = ""
+}
 
-  int message_begin_cb_called;
-  int headers_complete_cb_called;
-  int message_complete_cb_called;
-  int message_complete_on_eof;
-  int body_is_final;
-};
+struct message_result {
 
-static int currently_parsing_eof;
+  var message_begin_cb_called: Bool = false
+  var headers_complete_cb_called: Bool = false
+  var message_complete_cb_called: Bool = false
+  var body_is_final: Bool = false
+}
 
-static struct message messages[5];
-static int num_messages;
-static http_parser_settings *current_pause_parser;
+var currently_parsing_eof = false
 
+var messages = [message]()
+var message_results = [message_result](repeating: message_result(), count: 5)
+var num_messages = 0
+var current_pause_parser: http_parser_delegate? = nil
+
+let CURL_GET = 0
+let FIREFOX_GET = 1
+
+func getRequests() -> [message] {
 /* * R E Q U E S T S * */
-const struct message requests[] =
-#define CURL_GET 0
-{ {.name= "curl get"
-  ,.type= HTTP_REQUEST
-  ,.raw= "GET /test HTTP/1.1\r\n"
-         "User-Agent: curl/7.18.0 (i486-pc-linux-gnu) libcurl/7.18.0 OpenSSL/0.9.8g zlib/1.2.3.3 libidn/1.1\r\n"
-         "Host: 0.0.0.0=5000\r\n"
-         "Accept: */*\r\n"
+var requests: [message] = []
+//#define CURL_GET 0
+requests.append(message(
+  name: "curl get"
+  ,type: .HTTP_REQUEST
+  ,raw: "GET /test HTTP/1.1\r\n" +
+         "User-Agent: curl/7.18.0 (i486-pc-linux-gnu) libcurl/7.18.0 OpenSSL/0.9.8g zlib/1.2.3.3 libidn/1.1\r\n" +
+         "Host: 0.0.0.0=5000\r\n" +
+         "Accept: */*\r\n" +
          "\r\n"
-  ,.should_keep_alive= TRUE
-  ,.message_complete_on_eof= FALSE
-  ,.http_major= 1
-  ,.http_minor= 1
-  ,.method= HTTP_GET
-  ,.query_string= ""
-  ,.fragment= ""
-  ,.request_path= "/test"
-  ,.request_url= "/test"
-  ,.num_headers= 3
-  ,.headers=
-    { { "User-Agent", "curl/7.18.0 (i486-pc-linux-gnu) libcurl/7.18.0 OpenSSL/0.9.8g zlib/1.2.3.3 libidn/1.1" }
-    , { "Host", "0.0.0.0=5000" }
-    , { "Accept", "*/*" }
-    }
-  ,.body= ""
-  }
-
-#define FIREFOX_GET 1
-, {.name= "firefox get"
-  ,.type= HTTP_REQUEST
-  ,.raw= "GET /favicon.ico HTTP/1.1\r\n"
+  ,should_keep_alive: true
+  ,message_complete_on_eof: false
+  ,http_major: 1
+  ,http_minor: 1
+  ,method: .HTTP_GET
+  ,query_string: ""
+  ,fragment: ""
+  ,request_path: "/test"
+  ,request_url: "/test"
+  ,num_headers: 3
+  ,headers:
+    [ [ "User-Agent": "curl/7.18.0 (i486-pc-linux-gnu) libcurl/7.18.0 OpenSSL/0.9.8g zlib/1.2.3.3 libidn/1.1" ]
+    , [ "Host": "0.0.0.0=5000" ]
+    , [ "Accept": "*/*" ]
+    ]
+   ,body: ""
+  ))
+/*
+//#define FIREFOX_GET 1
+, {.name = "firefox get"
+  .type = .HTTP_REQUEST
+  .raw = "GET /favicon.ico HTTP/1.1\r\n"
          "Host: 0.0.0.0=5000\r\n"
          "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n"
-         "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+         "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,REPLACE_WITH_ASTERISK_SLASH_ASTERISK;q=0.8\r\n"
          "Accept-Language: en-us,en;q=0.5\r\n"
          "Accept-Encoding: gzip,deflate\r\n"
          "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n"
          "Keep-Alive: 300\r\n"
          "Connection: keep-alive\r\n"
          "\r\n"
-  ,.should_keep_alive= TRUE
-  ,.message_complete_on_eof= FALSE
-  ,.http_major= 1
-  ,.http_minor= 1
-  ,.method= HTTP_GET
-  ,.query_string= ""
-  ,.fragment= ""
-  ,.request_path= "/favicon.ico"
-  ,.request_url= "/favicon.ico"
-  ,.num_headers= 8
-  ,.headers=
-    { { "Host", "0.0.0.0=5000" }
-    , { "User-Agent", "Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0" }
-    , { "Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }
-    , { "Accept-Language", "en-us,en;q=0.5" }
-    , { "Accept-Encoding", "gzip,deflate" }
-    , { "Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.7" }
-    , { "Keep-Alive", "300" }
-    , { "Connection", "keep-alive" }
-    }
-  ,.body= ""
+  .should_keep_alive = true
+  .message_complete_on_eof = false
+  .http_major = 1
+  .http_minor = 1
+  .method = HTTP_GET
+  .query_string = ""
+  .fragment = ""
+  .request_path = "/favicon.ico"
+  .request_url = "/favicon.ico"
+  .num_headers = 8
+  .headers =
+    [ [ "Host", "0.0.0.0=5000" ]
+    , [ "User-Agent", "Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0" ]
+    , [ "Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,REPLACE_WITH_ASTERISK_SLASH_ASTERISK;q=0.8" ]
+    , [ "Accept-Language", "en-us,en;q=0.5" ]
+    , [ "Accept-Encoding", "gzip,deflate" ]
+    , [ "Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.7" ]
+    , [ "Keep-Alive", "300" ]
+    , [ "Connection", "keep-alive" ]
+    ]
+  .body = ""
   }
 
 #define DUMBFUCK 2
@@ -215,7 +219,7 @@ const struct message requests[] =
 , {.name= "get one header no body"
   ,.type= HTTP_REQUEST
   ,.raw= "GET /get_one_header_no_body HTTP/1.1\r\n"
-         "Accept: */*\r\n"
+         "Accept: REPLACE_WITH_ASTERISK_SLASH_ASTERISK\r\n"
          "\r\n"
   ,.should_keep_alive= TRUE
   ,.message_complete_on_eof= FALSE /* would need Connection: close */
@@ -228,7 +232,7 @@ const struct message requests[] =
   ,.request_url= "/get_one_header_no_body"
   ,.num_headers= 1
   ,.headers=
-    { { "Accept" , "*/*" }
+    { { "Accept" , "REPLACE_WITH_ASTERISK_SLASK_ASTERISK" }
     }
   ,.body= ""
   }
@@ -260,7 +264,7 @@ const struct message requests[] =
 , {.name= "post identity body world"
   ,.type= HTTP_REQUEST
   ,.raw= "POST /post_identity_body_world?q=search#hey HTTP/1.1\r\n"
-         "Accept: */*\r\n"
+         "Accept: REPLACE_WITH_ASTERISK_SLASK_ASTERISK\r\n"
          "Transfer-Encoding: identity\r\n"
          "Content-Length: 5\r\n"
          "\r\n"
@@ -276,7 +280,7 @@ const struct message requests[] =
   ,.request_url= "/post_identity_body_world?q=search#hey"
   ,.num_headers= 3
   ,.headers=
-    { { "Accept", "*/*" }
+    { { "Accept", "REPLACE_WITH_ASTERISK_SLASK_ASTERISK" }
     , { "Transfer-Encoding", "identity" }
     , { "Content-Length", "5" }
     }
@@ -427,7 +431,7 @@ const struct message requests[] =
   ,.raw= "GET /test HTTP/1.0\r\n"
          "Host: 0.0.0.0:5000\r\n"
          "User-Agent: ApacheBench/2.3\r\n"
-         "Accept: */*\r\n\r\n"
+         "Accept: REPLACE_WITH_ASTERISK_SLASK_ASTERISK\r\n\r\n"
   ,.should_keep_alive= FALSE
   ,.message_complete_on_eof= FALSE
   ,.http_major= 1
@@ -440,7 +444,7 @@ const struct message requests[] =
   ,.num_headers= 3
   ,.headers= { { "Host", "0.0.0.0:5000" }
              , { "User-Agent", "ApacheBench/2.3" }
-             , { "Accept", "*/*" }
+             , { "Accept", "REPLACE_WITH_ASTERISK_SLASK_ASTERISK" }
              }
   ,.body= ""
   }
@@ -1154,8 +1158,10 @@ const struct message requests[] =
   }
 
 , {.name= NULL } /* sentinel */
-};
-
+*/
+  return requests
+}
+/*
 /* * R E S P O N S E S * */
 const struct message responses[] =
 #define GOOGLE_301 0
@@ -1897,15 +1903,14 @@ count_body_cb (http_parser *p, const char *buf, size_t len)
   check_body_is_final(p);
   return 0;
 }
-
-int
-message_begin_cb (http_parser *p)
+*/
+func message_begin_cb () -> Int
 {
-  assert(p == parser);
-  messages[num_messages].message_begin_cb_called = TRUE;
-  return 0;
+  //assert(p == parser);
+  message_results[num_messages].message_begin_cb_called = true
+  return 0
 }
-
+/*
 int
 headers_complete_cb (http_parser *p)
 {
@@ -2199,20 +2204,52 @@ static http_parser_settings settings_pause =
   ,.on_chunk_header = pause_chunk_header_cb
   ,.on_chunk_complete = pause_chunk_complete_cb
   };
+*/
+class settings : http_parser_delegate {
+  /*on_message_begin = message_begin_cb
+  on_header_field = header_field_cb
+  on_header_value = header_value_cb
+  on_url = request_url_cb
+  on_status = response_status_cb
+  on_body = body_cb
+  on_headers_complete = headers_complete_cb
+  on_message_complete = message_complete_cb
+  on_chunk_header = chunk_header_cb
+  on_chunk_complete = chunk_complete_cb*/
+  
+  func on_message_begin() -> Int {
+    return message_begin_cb()
+  }
+  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return 0
+  }
+  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return 0
+  }
+  func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return 0
+  }
+  func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return 0
+  }
+  func on_headers_complete() -> Int {
+    return 0
+  }
+  func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return 0
+  }
+  func on_message_complete() -> Int {
+    return 0
+  }
+  func on_chunk_header() -> Int {
+    return 0
+  }
+  func on_chunk_complete() -> Int {
+    return 0
+  }
 
-static http_parser_settings settings =
-  {.on_message_begin = message_begin_cb
-  ,.on_header_field = header_field_cb
-  ,.on_header_value = header_value_cb
-  ,.on_url = request_url_cb
-  ,.on_status = response_status_cb
-  ,.on_body = body_cb
-  ,.on_headers_complete = headers_complete_cb
-  ,.on_message_complete = message_complete_cb
-  ,.on_chunk_header = chunk_header_cb
-  ,.on_chunk_complete = chunk_complete_cb
-  };
-
+}
+/*
 static http_parser_settings settings_count_body =
   {.on_message_begin = message_begin_cb
   ,.on_header_field = header_field_cb
@@ -2251,38 +2288,49 @@ static http_parser_settings settings_null =
   ,.on_chunk_header = 0
   ,.on_chunk_complete = 0
   };
-
-void
-parser_init (enum http_parser_type type)
+*/
+func parser_init (_ type: http_parser_type)
 {
-  num_messages = 0;
+  num_messages = 0
 
-  assert(parser == NULL);
+  assert(parser == nil)
 
-  parser = malloc(sizeof(http_parser));
+  parser = http_parser(t: type)
 
-  http_parser_init(parser, type);
+  parser?.reset(type)
 
-  memset(&messages, 0, sizeof messages);
+  messages = []
 
 }
 
-void
-parser_free ()
+func parser_free ()
 {
-  assert(parser);
-  free(parser);
-  parser = NULL;
+  assert(parser != nil)
+  parser = nil
 }
 
-size_t parse (const char *buf, size_t len)
+@discardableResult
+func parse (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  size_t nparsed;
-  currently_parsing_eof = (len == 0);
-  nparsed = http_parser_execute(parser, &settings, buf, len);
-  return nparsed;
+  currently_parsing_eof = (len == 0)
+  let nparsed = parser!.execute(settings(), buf, len)
+  return nparsed
 }
 
+@discardableResult
+func parse (string: String, _ len: Int) -> Int
+{
+  var nparsed = 0
+  currently_parsing_eof = (len == 0)
+  
+  let httpData = string.data(using: String.Encoding.utf8)!
+  
+  httpData.withUnsafeBytes {(bytes: UnsafePointer<UInt8>) -> Void in
+    nparsed = parser!.execute(settings(), bytes, len)
+  }
+  return nparsed
+}
+/*
 size_t parse_count_body (const char *buf, size_t len)
 {
   size_t nparsed;
@@ -3285,34 +3333,28 @@ test_message_count_body (const struct message *message)
 
   parser_free();
 }
-
-void
-test_simple (const char *buf, enum http_errno err_expected)
+*/
+func test_simple (_ buf: String, _ err_expected: http_errno)
 {
-  parser_init(HTTP_REQUEST);
+  parser_init(.HTTP_REQUEST)
 
-  enum http_errno err;
+  var err: http_errno
 
-  parse(buf, strlen(buf));
-  err = HTTP_PARSER_ERRNO(parser);
-  parse(NULL, 0);
+  parse(string: buf, buf.characters.count)
+  err = HTTP_PARSER_ERRNO(parser)
+  parse(string: "", 0)
 
-  parser_free();
+  parser_free()
 
   /* In strict mode, allow us to pass with an unexpected HPE_STRICT as
    * long as the caller isn't expecting success.
    */
-#if HTTP_PARSER_STRICT
-  if (err_expected != err && err_expected != HPE_OK && err != HPE_STRICT) {
-#else
-  if (err_expected != err) {
-#endif
-    fprintf(stderr, "\n*** test_simple expected %s, but saw %s ***\n\n%s\n",
-        http_errno_name(err_expected), http_errno_name(err), buf);
+  if (err_expected != err && err_expected != .HPE_OK && err != .HPE_STRICT) {
+    print("\n*** test_simple expected \(http_parser.errno_name(err_expected)), but saw \(http_parser.errno_name(err)) ***\n\n\\\(buf)")
     abort();
   }
 }
-
+/*
 void
 test_invalid_header_content (int req, const char* str)
 {
@@ -3864,28 +3906,28 @@ test_message_connect (const struct message *msg)
 
   parser_free();
 }
+*/
 
-int
-main (void)
+class ParserTests: XCTestCase {
+  
+
+func testMain ()
 {
-  parser = NULL;
-  int i, j, k;
+  //var parser = http_parser()
+  /*int i, j, k;
   int request_count;
-  int response_count;
-  unsigned long version;
-  unsigned major;
-  unsigned minor;
-  unsigned patch;
+  int response_count;*/
 
-  version = http_parser_version();
-  major = (version >> 16) & 255;
-  minor = (version >> 8) & 255;
-  patch = version & 255;
-  printf("http_parser v%u.%u.%u (0x%06lx)\n", major, minor, patch, version);
 
-  printf("sizeof(http_parser) = %u\n", (unsigned int)sizeof(http_parser));
+  let version = http_parser.version()
+  let major = (version >> 16) & 255;
+  let minor = (version >> 8) & 255;
+  let patch = version & 255;
+  print("http_parser v\(major).\(minor).\(patch) (\(version))")
 
-  for (request_count = 0; requests[request_count].name; request_count++);
+  //printf("sizeof(http_parser) = \(sizeof(http_parser))")
+
+  /*for (request_count = 0; requests[request_count].name; request_count++);
   for (response_count = 0; responses[response_count].name; response_count++);
 
   //// API
@@ -3995,26 +4037,26 @@ main (void)
            );
 
   puts("responses okay");
-
+*/
 
   /// REQUESTS
 
-  test_simple("GET / HTP/1.1\r\n\r\n", HPE_INVALID_VERSION);
+  test_simple("GET / HTP/1.1\r\n\r\n", .HPE_INVALID_VERSION)
 
   // Extended characters - see nodejs/test/parallel/test-http-headers-obstext.js
-  test_simple("GET / HTTP/1.1\r\n"
+  test_simple("GET / HTTP/1.1\r\n" +
               "Test: Düsseldorf\r\n",
-              HPE_OK);
+              .HPE_OK)
 
   // Well-formed but incomplete
-  test_simple("GET / HTTP/1.1\r\n"
-              "Content-Type: text/plain\r\n"
-              "Content-Length: 6\r\n"
-              "\r\n"
+  test_simple("GET / HTTP/1.1\r\n" +
+              "Content-Type: text/plain\r\n" +
+              "Content-Length: 6\r\n" +
+              "\r\n" +
               "fooba",
-              HPE_OK);
+              .HPE_OK)
 
-  static const char *all_methods[] = {
+  let all_methods: [String] = [
     "DELETE",
     "GET",
     "HEAD",
@@ -4048,15 +4090,14 @@ main (void)
     "MKCALENDAR",
     "LINK",
     "UNLINK",
-    0 };
-  const char **this_method;
-  for (this_method = all_methods; *this_method; this_method++) {
-    char buf[200];
-    sprintf(buf, "%s / HTTP/1.1\r\n\r\n", *this_method);
-    test_simple(buf, HPE_OK);
+  ]
+
+  for method in all_methods {
+    let buf = "\(method) / HTTP/1.1\r\n\r\n"
+    test_simple(buf, .HPE_OK)
   }
 
-  static const char *bad_methods[] = {
+  let bad_methods: [String] = [
       "ASDF",
       "C******",
       "COLA",
@@ -4069,88 +4110,75 @@ main (void)
       "PX",
       "SA",
       "hello world",
-      0 };
-  for (this_method = bad_methods; *this_method; this_method++) {
-    char buf[200];
-    sprintf(buf, "%s / HTTP/1.1\r\n\r\n", *this_method);
-    test_simple(buf, HPE_INVALID_METHOD);
+  ]
+  for this_method in bad_methods{
+    let buf = "\(this_method) / HTTP/1.1\r\n\r\n"
+    test_simple(buf, .HPE_INVALID_METHOD)
   }
 
   // illegal header field name line folding
-  test_simple("GET / HTTP/1.1\r\n"
-              "name\r\n"
-              " : value\r\n"
+  test_simple("GET / HTTP/1.1\r\n" +
+              "name\r\n" +
+              " : value\r\n" +
               "\r\n",
-              HPE_INVALID_HEADER_TOKEN);
+              .HPE_INVALID_HEADER_TOKEN)
 
-  const char *dumbfuck2 =
-    "GET / HTTP/1.1\r\n"
-    "X-SSL-Bullshit:   -----BEGIN CERTIFICATE-----\r\n"
-    "\tMIIFbTCCBFWgAwIBAgICH4cwDQYJKoZIhvcNAQEFBQAwcDELMAkGA1UEBhMCVUsx\r\n"
-    "\tETAPBgNVBAoTCGVTY2llbmNlMRIwEAYDVQQLEwlBdXRob3JpdHkxCzAJBgNVBAMT\r\n"
-    "\tAkNBMS0wKwYJKoZIhvcNAQkBFh5jYS1vcGVyYXRvckBncmlkLXN1cHBvcnQuYWMu\r\n"
-    "\tdWswHhcNMDYwNzI3MTQxMzI4WhcNMDcwNzI3MTQxMzI4WjBbMQswCQYDVQQGEwJV\r\n"
-    "\tSzERMA8GA1UEChMIZVNjaWVuY2UxEzARBgNVBAsTCk1hbmNoZXN0ZXIxCzAJBgNV\r\n"
-    "\tBAcTmrsogriqMWLAk1DMRcwFQYDVQQDEw5taWNoYWVsIHBhcmQYJKoZIhvcNAQEB\r\n"
-    "\tBQADggEPADCCAQoCggEBANPEQBgl1IaKdSS1TbhF3hEXSl72G9J+WC/1R64fAcEF\r\n"
-    "\tW51rEyFYiIeZGx/BVzwXbeBoNUK41OK65sxGuflMo5gLflbwJtHBRIEKAfVVp3YR\r\n"
-    "\tgW7cMA/s/XKgL1GEC7rQw8lIZT8RApukCGqOVHSi/F1SiFlPDxuDfmdiNzL31+sL\r\n"
-    "\t0iwHDdNkGjy5pyBSB8Y79dsSJtCW/iaLB0/n8Sj7HgvvZJ7x0fr+RQjYOUUfrePP\r\n"
-    "\tu2MSpFyf+9BbC/aXgaZuiCvSR+8Snv3xApQY+fULK/xY8h8Ua51iXoQ5jrgu2SqR\r\n"
-    "\twgA7BUi3G8LFzMBl8FRCDYGUDy7M6QaHXx1ZWIPWNKsCAwEAAaOCAiQwggIgMAwG\r\n"
-    "\tA1UdEwEB/wQCMAAwEQYJYIZIAYb4QgHTTPAQDAgWgMA4GA1UdDwEB/wQEAwID6DAs\r\n"
-    "\tBglghkgBhvhCAQ0EHxYdVUsgZS1TY2llbmNlIFVzZXIgQ2VydGlmaWNhdGUwHQYD\r\n"
-    "\tVR0OBBYEFDTt/sf9PeMaZDHkUIldrDYMNTBZMIGaBgNVHSMEgZIwgY+AFAI4qxGj\r\n"
-    "\tloCLDdMVKwiljjDastqooXSkcjBwMQswCQYDVQQGEwJVSzERMA8GA1UEChMIZVNj\r\n"
-    "\taWVuY2UxEjAQBgNVBAsTCUF1dGhvcml0eTELMAkGA1UEAxMCQ0ExLTArBgkqhkiG\r\n"
-    "\t9w0BCQEWHmNhLW9wZXJhdG9yQGdyaWQtc3VwcG9ydC5hYy51a4IBADApBgNVHRIE\r\n"
-    "\tIjAggR5jYS1vcGVyYXRvckBncmlkLXN1cHBvcnQuYWMudWswGQYDVR0gBBIwEDAO\r\n"
-    "\tBgwrBgEEAdkvAQEBAQYwPQYJYIZIAYb4QgEEBDAWLmh0dHA6Ly9jYS5ncmlkLXN1\r\n"
-    "\tcHBvcnQuYWMudmT4sopwqlBWsvcHViL2NybC9jYWNybC5jcmwwPQYJYIZIAYb4QgEDBDAWLmh0\r\n"
-    "\tdHA6Ly9jYS5ncmlkLXN1cHBvcnQuYWMudWsvcHViL2NybC9jYWNybC5jcmwwPwYD\r\n"
-    "\tVR0fBDgwNjA0oDKgMIYuaHR0cDovL2NhLmdyaWQt5hYy51ay9wdWIv\r\n"
-    "\tY3JsL2NhY3JsLmNybDANBgkqhkiG9w0BAQUFAAOCAQEAS/U4iiooBENGW/Hwmmd3\r\n"
-    "\tXCy6Zrt08YjKCzGNjorT98g8uGsqYjSxv/hmi0qlnlHs+k/3Iobc3LjS5AMYr5L8\r\n"
-    "\tUO7OSkgFFlLHQyC9JzPfmLCAugvzEbyv4Olnsr8hbxF1MbKZoQxUZtMVu29wjfXk\r\n"
-    "\thTeApBv7eaKCWpSp7MCbvgzm74izKhu3vlDk9w6qVrxePfGgpKPqfHiOoGhFnbTK\r\n"
-    "\twTC6o2xq5y0qZ03JonF7OJspEd3I5zKY3E+ov7/ZhW6DqT8UFvsAdjvQbXyhV8Eu\r\n"
-    "\tYhixw1aKEPzNjNowuIseVogKOLXxWI5vAi5HgXdS0/ES5gDGsABo4fqovUKlgop3\r\n"
-    "\tRA==\r\n"
-    "\t-----END CERTIFICATE-----\r\n"
-    "\r\n";
-  test_simple(dumbfuck2, HPE_OK);
+  let dumbfuck2 =
+    "GET / HTTP/1.1\r\n" +
+    "X-SSL-Bullshit:   -----BEGIN CERTIFICATE-----\r\n" +
+    "\tMIIFbTCCBFWgAwIBAgICH4cwDQYJKoZIhvcNAQEFBQAwcDELMAkGA1UEBhMCVUsx\r\n" +
+    "\tETAPBgNVBAoTCGVTY2llbmNlMRIwEAYDVQQLEwlBdXRob3JpdHkxCzAJBgNVBAMT\r\n" +
+    "\tAkNBMS0wKwYJKoZIhvcNAQkBFh5jYS1vcGVyYXRvckBncmlkLXN1cHBvcnQuYWMu\r\n" +
+    "\tdWswHhcNMDYwNzI3MTQxMzI4WhcNMDcwNzI3MTQxMzI4WjBbMQswCQYDVQQGEwJV\r\n" +
+    "\tSzERMA8GA1UEChMIZVNjaWVuY2UxEzARBgNVBAsTCk1hbmNoZXN0ZXIxCzAJBgNV\r\n" +
+    "\tBAcTmrsogriqMWLAk1DMRcwFQYDVQQDEw5taWNoYWVsIHBhcmQYJKoZIhvcNAQEB\r\n" +
+    "\tBQADggEPADCCAQoCggEBANPEQBgl1IaKdSS1TbhF3hEXSl72G9J+WC/1R64fAcEF\r\n" +
+    "\tW51rEyFYiIeZGx/BVzwXbeBoNUK41OK65sxGuflMo5gLflbwJtHBRIEKAfVVp3YR\r\n" +
+    "\tgW7cMA/s/XKgL1GEC7rQw8lIZT8RApukCGqOVHSi/F1SiFlPDxuDfmdiNzL31+sL\r\n" +
+    "\t0iwHDdNkGjy5pyBSB8Y79dsSJtCW/iaLB0/n8Sj7HgvvZJ7x0fr+RQjYOUUfrePP\r\n" +
+    "\tu2MSpFyf+9BbC/aXgaZuiCvSR+8Snv3xApQY+fULK/xY8h8Ua51iXoQ5jrgu2SqR\r\n" +
+    "\twgA7BUi3G8LFzMBl8FRCDYGUDy7M6QaHXx1ZWIPWNKsCAwEAAaOCAiQwggIgMAwG\r\n" +
+    "\tA1UdEwEB/wQCMAAwEQYJYIZIAYb4QgHTTPAQDAgWgMA4GA1UdDwEB/wQEAwID6DAs\r\n" +
+    "\tBglghkgBhvhCAQ0EHxYdVUsgZS1TY2llbmNlIFVzZXIgQ2VydGlmaWNhdGUwHQYD\r\n" +
+    "\tVR0OBBYEFDTt/sf9PeMaZDHkUIldrDYMNTBZMIGaBgNVHSMEgZIwgY+AFAI4qxGj\r\n" +
+    "\tloCLDdMVKwiljjDastqooXSkcjBwMQswCQYDVQQGEwJVSzERMA8GA1UEChMIZVNj\r\n" +
+    "\taWVuY2UxEjAQBgNVBAsTCUF1dGhvcml0eTELMAkGA1UEAxMCQ0ExLTArBgkqhkiG\r\n" +
+    "\t9w0BCQEWHmNhLW9wZXJhdG9yQGdyaWQtc3VwcG9ydC5hYy51a4IBADApBgNVHRIE\r\n" +
+    "\tIjAggR5jYS1vcGVyYXRvckBncmlkLXN1cHBvcnQuYWMudWswGQYDVR0gBBIwEDAO\r\n" +
+    "\tBgwrBgEEAdkvAQEBAQYwPQYJYIZIAYb4QgEEBDAWLmh0dHA6Ly9jYS5ncmlkLXN1\r\n" +
+    "\tcHBvcnQuYWMudmT4sopwqlBWsvcHViL2NybC9jYWNybC5jcmwwPQYJYIZIAYb4QgEDBDAWLmh0\r\n" +
+    "\tdHA6Ly9jYS5ncmlkLXN1cHBvcnQuYWMudWsvcHViL2NybC9jYWNybC5jcmwwPwYD\r\n" +
+    "\tVR0fBDgwNjA0oDKgMIYuaHR0cDovL2NhLmdyaWQt5hYy51ay9wdWIv\r\n" +
+    "\tY3JsL2NhY3JsLmNybDANBgkqhkiG9w0BAQUFAAOCAQEAS/U4iiooBENGW/Hwmmd3\r\n" +
+    "\tXCy6Zrt08YjKCzGNjorT98g8uGsqYjSxv/hmi0qlnlHs+k/3Iobc3LjS5AMYr5L8\r\n" +
+    "\tUO7OSkgFFlLHQyC9JzPfmLCAugvzEbyv4Olnsr8hbxF1MbKZoQxUZtMVu29wjfXk\r\n" +
+    "\thTeApBv7eaKCWpSp7MCbvgzm74izKhu3vlDk9w6qVrxePfGgpKPqfHiOoGhFnbTK\r\n" +
+    "\twTC6o2xq5y0qZ03JonF7OJspEd3I5zKY3E+ov7/ZhW6DqT8UFvsAdjvQbXyhV8Eu\r\n" +
+    "\tYhixw1aKEPzNjNowuIseVogKOLXxWI5vAi5HgXdS0/ES5gDGsABo4fqovUKlgop3\r\n" +
+    "\tRA==\r\n" +
+    "\t-----END CERTIFICATE-----\r\n" +
+    "\r\n"
+  test_simple(dumbfuck2, .HPE_OK)
 
-  const char *corrupted_connection =
-    "GET / HTTP/1.1\r\n"
-    "Host: www.example.com\r\n"
-    "Connection\r\033\065\325eep-Alive\r\n"
-    "Accept-Encoding: gzip\r\n"
-    "\r\n";
-  test_simple(corrupted_connection, HPE_INVALID_HEADER_TOKEN);
+  let corrupted_connection =
+    "GET / HTTP/1.1\r\n" +
+    "Host: www.example.com\r\n" +
+    "Connection\r\(033)\(065)\(325)eep-Alive\r\n" +
+    "Accept-Encoding: gzip\r\n" +
+    "\r\n"
+  test_simple(corrupted_connection, .HPE_INVALID_HEADER_TOKEN)
 
-  const char *corrupted_header_name =
-    "GET / HTTP/1.1\r\n"
-    "Host: www.example.com\r\n"
-    "X-Some-Header\r\033\065\325eep-Alive\r\n"
-    "Accept-Encoding: gzip\r\n"
-    "\r\n";
-  test_simple(corrupted_header_name, HPE_INVALID_HEADER_TOKEN);
+  let corrupted_header_name =
+    "GET / HTTP/1.1\r\n" +
+    "Host: www.example.com\r\n" +
+    "X-Some-Header\r\(033)\(065)\(325)eep-Alive\r\n" +
+    "Accept-Encoding: gzip\r\n" +
+    "\r\n"
+  test_simple(corrupted_header_name, .HPE_INVALID_HEADER_TOKEN)
 
-#if 0
-  // NOTE(Wed Nov 18 11:57:27 CET 2009) this seems okay. we just read body
-  // until EOF.
-  //
-  // no content-length
-  // error if there is a body without content length
-  const char *bad_get_no_headers_no_body = "GET /bad_get_no_headers_no_body/world HTTP/1.1\r\n"
-                                           "Accept: */*\r\n"
-                                           "\r\n"
-                                           "HELLO";
-  test_simple(bad_get_no_headers_no_body, 0);
-#endif
   /* TODO sending junk and large headers gets rejected */
 
-
+/*
   /* check to make sure our predefined requests are okay */
   for (i = 0; requests[i].name; i++) {
     test_message(&requests[i]);
@@ -4193,8 +4221,8 @@ main (void)
            , &requests[PREFIX_NEWLINE_GET ]
            , &requests[CONNECT_REQUEST]
            );
+*/
+  print("requests okay")
+}
 
-  puts("requests okay");
-
-  return 0;
 }
