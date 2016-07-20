@@ -20,8 +20,10 @@
  */
 
 /*
- Swift 3 port
- Copyright (c) 2016 Dave Sperling - Smith Micro Software, Inc.
+ * Swift 3 port
+ * Copyright (c) 2016 Dave Sperling - Smith Micro Software, Inc.
+ * Swift changes are licensed under the same terms above.
+ * All rights reserved.
 */
 
 import Foundation
@@ -82,37 +84,55 @@ class HTTPCallback: http_parser_delegate {
 func bench(_ iter_count: Int, silent: Bool) -> Int {
     let parser = http_parser()
     let settings = HTTPCallback()
-    let start = Date()
     var rps = 0.0
-    let httpData = data.data(using: String.Encoding.utf8)!
-    
-    httpData.withUnsafeBytes {(bytes: UnsafePointer<UInt8>) -> Void in
-        
+
+    #if os(Linux)
+        let start = NSDate()
+        let httpData = data.data(using: NSUTF8StringEncoding)!
         for _ in 0 ..< iter_count {
             var parsed = 0
             parser.reset(.HTTP_REQUEST)
-            
-            parsed = parser.execute(settings, bytes, httpData.count)
-            assert(parsed == httpData.count)
+
+            parsed = parser.execute(settings, UnsafePointer<UInt8>(httpData.bytes), httpData.length)
+            assert(parsed == httpData.length)
         }
-        
-    }
-    
+    #else
+        let start = Date()
+        let httpData = data.data(using: String.Encoding.utf8)!
+        httpData.withUnsafeBytes {(bytes: UnsafePointer<UInt8>) -> Void in
+
+            for _ in 0 ..< iter_count {
+                var parsed = 0
+                parser.reset(.HTTP_REQUEST)
+
+                parsed = parser.execute(settings, bytes, httpData.count)
+                assert(parsed == httpData.count)
+            }
+        }
+    #endif
+
     if !silent {
         print("Benchmark result:");
-        
-        rps = Date().timeIntervalSince(start)
+
+        rps = NSDate().timeIntervalSince(start)
         print("Took \(Double(Int(rps * 100))/100.0) seconds to run");
-        
+
         rps = Double(iter_count) / rps
         print("\(Double(Int(rps * 100))/100.0) req/sec")
     }
-    
+
     return 0
 }
 
 class BenchmarkTests: XCTestCase {
-    
+
+    static var allTests : [(String, (BenchmarkTests) -> () throws -> Void)] {
+        return [
+            ("testVersion", testVersion),
+            ("testBenchmark", testBenchmark),
+        ]
+    }
+
     func testVersion() {
         let version = http_parser.version()
         let major = (version >> 16) & 255
@@ -123,11 +143,12 @@ class BenchmarkTests: XCTestCase {
 
     func testBenchmark()  {
 
-        //let loop = 5000000
-        let loop = 500000
+        var loop = 5000000
+        print("with DEBUG mode on - don't expect 500K req/sec")
+        // don't run the full loop of 500K in case DEBUG is on
+        // TODO - in Swift 3, how do we detect DEBUG ?
+        loop = loop / 10
         let result = bench(loop, silent: false)
         XCTAssertTrue(result == 0)
     }
 }
-
-

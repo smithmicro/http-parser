@@ -1,0 +1,8 @@
+version: '2'
+
+services:
+  test:
+    image: swiftdocker/swift
+    volumes:
+    - ./:/test/
+    command: bash -c "swift build -C /test --clean && swift build -C /test && swift test -C /test"

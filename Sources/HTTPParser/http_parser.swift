@@ -22,44 +22,11 @@
  * IN THE SOFTWARE.
  */
 
-/*
- Swift 3 port
- Copyright (c) 2016 Dave Sperling - Smith Micro Software, Inc.
-
- Objectives
- * Leveral the existing 'C' logic
- * Allow for http-parser.c changes to be ported in the future
- * Keep all variable and function names the same
-   * Only change API visible API's to be object oriented
- * Leave unnecessary markup in place such as:
-   * End of case 'break'
-   * Parenthesis in if statements
- 
-API Changes:
- struct http_parser          -> class http_parser
- struct http_parser_settings -> protocol http_parser_delegate
- 
- http_parser_version()       -> version()
- http_parser_init()          -> reset()
- http_parser_settings_init() -> settings()
- http_parser_execute()       -> execute()
- http_should_keep_alive()    -> should_keep_alive()
- http_method_str()           -> method_str()
- http_errno_name()           -> errno_name()
- http_errno_description()    -> errno_description()
- http_parser_pause()         -> pause()
- http_body_is_final()        -> body_is_final()
- 
- Not implemented since we have the Foundation URL class:
- http_parser_url_init()
- http_parser_parse_url()
- 
- 'C' Version Goal
-   781943 req/sec
-  
- Swift - current version
-   566370 req/sec (1.35 times slower)
-
+ /*
+  * Swift 3 port
+  * Copyright (c) 2016 Dave Sperling - Smith Micro Software, Inc.
+  * Swift changes are licensed under the same terms above.
+  * All rights reserved.
  */
 
 import Foundation
@@ -70,8 +37,8 @@ private let HTTP_PARSER_VERSION_MINOR = 7
 private let HTTP_PARSER_VERSION_PATCH = 0
 
 
-/* Maximium header size allowed. This was a macro in the 'C' version
- * however making this a var reduces performace by 15%.
+/* Maximum header size allowed. This was a macro in the 'C' version
+ * however making this a var reduces performance by 15%.
  * Keep this a read only macro for now.
  */
 private let HTTP_MAX_HEADER_SIZE = 80*1024
@@ -86,7 +53,7 @@ private let HTTP_MAX_HEADER_SIZE = 80*1024
  * chunked' headers that indicate the presence of a body.
  *
  * Returning `2` from on_headers_complete will tell parser that it should not
- * expect neither a body nor any futher responses on this connection. This is
+ * expect neither a body nor any further responses on this connection. This is
  * useful for handling responses to a CONNECT request which may not contain
  * `Upgrade` or `Connection: upgrade` headers.
  *
@@ -152,9 +119,9 @@ public enum http_method: Int {
   /* RFC-2068, section 19.6.1.2 */
   case HTTP_LINK
   case HTTP_UNLINK
-  
+
   static var count: Int { return http_method.HTTP_UNLINK.rawValue + 1}
-  
+
   var string: String {
     switch self {
     case .HTTP_DELETE: return "DELETE"
@@ -247,7 +214,7 @@ public enum http_errno: String, ErrorProtocol {
   case HPE_STRICT                 // "strict mode assertion failed"
   case HPE_PAUSED                 // "parser is paused"
   case HPE_UNKNOWN                // "an unknown error occurred"
-  
+
   var description: String {
     switch self {
     case .HPE_OK:                     return "success"
@@ -295,7 +262,7 @@ private func SET_ERRNO(_ e: http_errno) throws {
   http_errno = e
   throw http_errno
 }
-  
+
 private func LIKELY(_ X: Bool) -> Bool { return X }
 private func UNLIKELY(_ X: Bool) -> Bool { return X }
 
@@ -303,14 +270,14 @@ private func UNLIKELY(_ X: Bool) -> Bool { return X }
 private enum http_mark {
   case status, url, header_field, header_value, body
 }
-  
+
 private enum http_notify {
   case message_complete, message_begin, chunk_header, chunk_complete
 }
-  
+
 private func CALLBACK_NOTIFY(_ p_state: state, _ FOR: http_notify) {
   assert(self.http_errno == .HPE_OK)
-  
+
   self.state = p_state
   switch FOR {
   case .message_complete:
@@ -343,7 +310,7 @@ private func CALLBACK_NOTIFY(_ p_state: state, _ FOR: http_notify) {
 private func CALLBACK_NOTIFY_NOADVANCE(_ p_state: state, _ FOR: http_notify) {
   CALLBACK_NOTIFY(p_state, FOR)
 }
-  
+
 private func CALLBACK_DATA_(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark, _ LEN: Int) {
   assert(self.http_errno == .HPE_OK)
 
@@ -425,7 +392,7 @@ private func CALLBACK_DATA(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: 
     }
   }
 }
-  
+
 private func CALLBACK_DATA_NOADVANCE(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark) {
   CALLBACK_DATA(p_state, p, FOR)
 }
@@ -482,12 +449,7 @@ private func COUNT_HEADER_SIZE(_ V: Int) throws {
 }
 
 private class func stringToArray(string: String) -> [UInt8] {
-  var chars:[UInt8] = []
-  let data = string.data(using: String.Encoding.utf8)!
-  for c in data {
-    chars.append(c)
-  }
-  return chars
+  return Array(string.utf8)
 }
 
 private let PROXY_CONNECTION = http_parser.stringToArray(string: "proxy-connection")
@@ -689,7 +651,7 @@ private var index: Int               /* index into current matcher */
 private var lenient_http_headers: Bool
 private var nread: Int               /* # bytes read in various scenarios */
 private var delegate: http_parser_delegate? = nil
-  
+
 public var content_length: UInt64    /* # bytes in body (0 if no Content-Length header) */
 public var http_major: Int16
 public var http_minor: Int16
@@ -709,7 +671,7 @@ public init(t: http_parser_type = .HTTP_REQUEST) {
   type = t
   self.state = (t == .HTTP_REQUEST ? .s_start_req : (t == .HTTP_RESPONSE ? .s_start_res : .s_start_req_or_res))
   http_errno = .HPE_OK
-  
+
   flags = 0
   header_state = .h_general
   index = 0
@@ -831,7 +793,7 @@ private let ASCII_VBAT: UInt8 = 124         // |	(vertical-bar, vbar, vertical l
 private let ASCII_R_BRACE: UInt8 = 125	    // }	(curly brackets or braces)
 private let ASCII_TILDE: UInt8 = 126        // ~	(Tilde ; swung dash)
 
-  
+
 private func LOWER(_ c: UInt8) -> UInt8 {
   return c | 0x20
 }
@@ -871,7 +833,7 @@ private func IS_URL_CHAR(_ c: UInt8) -> Bool {
 private func IS_HOST_CHAR(_ c: UInt8) -> Bool {
   return IS_ALPHANUM(c) || c == ASCII_DOT || c == ASCII_HYPHEN
 }
-  
+
 /**
  * Verify that a char is a valid visible (printable) US-ASCII
  * character or %x80-FF
@@ -894,7 +856,7 @@ private func STRICT_CHECK(_ cond: Bool) throws {
     throw http_errno
   }
 }
-  
+
 private func NEW_MESSAGE() -> state {
   return (should_keep_alive() ? (self.type == .HTTP_REQUEST ? .s_start_req : .s_start_res) : .s_dead)
 }
@@ -1038,7 +1000,7 @@ private func parse_url_char(_ s: state, _ ch: UInt8) -> state
 
         case ASCII_POUND:
           return s
-      
+
         default:
           break
       }
@@ -1080,7 +1042,7 @@ public func execute (_ settings: http_parser_delegate,
   var p: UnsafePointer<UInt8> = data
   var p_state = self.state
   let lenient = self.lenient_http_headers
-  
+
   delegate = settings
 
   /* We're in an error state. Don't bother doing anything. */
@@ -1401,9 +1363,6 @@ public func execute (_ settings: http_parser_delegate,
           case ASCII_T: self.method = .HTTP_TRACE; break
           case ASCII_U: self.method = .HTTP_UNLOCK; /* or UNSUBSCRIBE, UNBIND, UNLINK */ break
           default:
-            let data = Data(bytes: data, count: len)
-            let str = String(data: data, encoding: String.Encoding.utf8)
-            print(str)
             try SET_ERRNO(.HPE_INVALID_METHOD)
         }
         p_state = .s_req_method
@@ -1683,7 +1642,7 @@ public func execute (_ settings: http_parser_delegate,
 
       case .s_header_field:
         let start: UnsafePointer<UInt8> = p
-        
+
         while (p != data + len) {
           ch = p[0]
           c = TOKEN(ch)
@@ -2405,7 +2364,7 @@ public func execute (_ settings: http_parser_delegate,
         assert(false, "unhandled state")
         try SET_ERRNO(.HPE_INVALID_INTERNAL_STATE)*/
     }
- 
+
     p += 1
   }
 
@@ -2504,7 +2463,7 @@ public func reset(_ t: http_parser_type)
   type = t
   self.state = (t == .HTTP_REQUEST ? .s_start_req : (t == .HTTP_RESPONSE ? .s_start_res : .s_start_req_or_res))
   http_errno = .HPE_OK
-    
+
   flags = 0
   header_state = .h_general
   index = 0

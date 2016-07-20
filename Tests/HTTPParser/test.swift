@@ -19,9 +19,11 @@
  * IN THE SOFTWARE.
  */
 
-/*
- Swift 3 port
- Copyright (c) 2016 Dave Sperling - Smith Micro Software, Inc.
+ /*
+  * Swift 3 port
+  * Copyright (c) 2016 Dave Sperling - Smith Micro Software, Inc.
+  * Swift changes are licensed under the same terms above.
+  * All rights reserved.
  */
 
 import Foundation
@@ -2216,7 +2218,7 @@ class settings : http_parser_delegate {
   on_message_complete = message_complete_cb
   on_chunk_header = chunk_header_cb
   on_chunk_complete = chunk_complete_cb*/
-  
+
   func on_message_begin() -> Int {
     return message_begin_cb()
   }
@@ -2322,12 +2324,19 @@ func parse (string: String, _ len: Int) -> Int
 {
   var nparsed = 0
   currently_parsing_eof = (len == 0)
-  
+
+  #if os(Linux)
+    // Linux String.data() still returns nil on an empty string
+  let httpData = string.data(using: NSUTF8StringEncoding) ?? NSData()
+  nparsed = parser!.execute(settings(), UnsafePointer<UInt8>(httpData.bytes), httpData.length)
+
+  #else
   let httpData = string.data(using: String.Encoding.utf8)!
-  
   httpData.withUnsafeBytes {(bytes: UnsafePointer<UInt8>) -> Void in
     nparsed = parser!.execute(settings(), bytes, len)
   }
+  #endif
+
   return nparsed
 }
 /*
@@ -3909,7 +3918,13 @@ test_message_connect (const struct message *msg)
 */
 
 class ParserTests: XCTestCase {
-  
+
+  static var allTests : [(String, (ParserTests) -> () throws -> Void)] {
+    return [
+      ("testMain", testMain)
+    ]
+  }
+
 
 func testMain ()
 {
