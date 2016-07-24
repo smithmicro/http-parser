@@ -27,9 +27,7 @@
 */
 
 import Foundation
-
-@testable import HTTPParser
-import XCTest
+import HTTPParser
 
 let data =
 "POST /joyent/http-parser HTTP/1.1\r\n" +
@@ -124,31 +122,11 @@ func bench(_ iter_count: Int, silent: Bool) -> Int {
     return 0
 }
 
-class BenchmarkTests: XCTestCase {
 
-    static var allTests : [(String, (BenchmarkTests) -> () throws -> Void)] {
-        return [
-            ("testVersion", testVersion),
-            ("testBenchmark", testBenchmark),
-        ]
-    }
+func main() -> Int {
 
-    func testVersion() {
-        let version = http_parser.version()
-        let major = (version >> 16) & 255
-        let minor = (version >> 8) & 255
-        let patch = version & 255
-        print("http_parser v\(major).\(minor).\(patch)")
-    }
-
-    func testBenchmark()  {
-
-        var loop = 5000000
-        print("with DEBUG mode on - don't expect 500K req/sec")
-        // don't run the full loop of 500K in case DEBUG is on
-        // TODO - in Swift 3, how do we detect DEBUG ?
-        loop = loop / 10
-        let result = bench(loop, silent: false)
-        XCTAssertTrue(result == 0)
-    }
+    let loop = 5000000
+    return bench(loop, silent: false)
 }
+
+let result = main()

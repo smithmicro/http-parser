@@ -275,7 +275,7 @@ private enum http_notify {
   case message_complete, message_begin, chunk_header, chunk_complete
 }
 
-private func CALLBACK_NOTIFY(_ p_state: state, _ FOR: http_notify) {
+private func CALLBACK_NOTIFY(_ p_state: state, _ FOR: http_notify) -> Bool {
   assert(self.http_errno == .HPE_OK)
 
   self.state = p_state
@@ -305,13 +305,14 @@ private func CALLBACK_NOTIFY(_ p_state: state, _ FOR: http_notify) {
       }
     }
   }
+  /* We either errored above or got paused; get out */
+  if UNLIKELY(http_errno != .HPE_OK) {
+    return true
+  }
+  return false
 }
 
-private func CALLBACK_NOTIFY_NOADVANCE(_ p_state: state, _ FOR: http_notify) {
-  CALLBACK_NOTIFY(p_state, FOR)
-}
-
-private func CALLBACK_DATA_(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark, _ LEN: Int) {
+private func CALLBACK_DATA_(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark, _ LEN: Int) -> Bool {
   assert(self.http_errno == .HPE_OK)
 
   switch FOR {
@@ -366,35 +367,37 @@ private func CALLBACK_DATA_(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR:
       body_mark = nil
     }
   }
+    /* We either errored above or got paused; get out */
+    if UNLIKELY(http_errno != .HPE_OK) {
+        return true
+    }
+  return false
 }
 
-private func CALLBACK_DATA(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark) {
+private func CALLBACK_DATA(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark) -> Bool {
   switch FOR {
   case .status:
     if let mark = status_mark {
-      CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
     }
   case .url:
     if let mark = url_mark {
-      CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
     }
   case .header_field:
     if let mark = header_field_mark {
-      CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
     }
   case .header_value:
     if let mark = header_value_mark {
-      CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
     }
   case .body:
     if let mark = body_mark {
-      CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
     }
   }
-}
-
-private func CALLBACK_DATA_NOADVANCE(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark) {
-  CALLBACK_DATA(p_state, p, FOR)
+  return false
 }
 
 private var header_field_mark: UnsafePointer<UInt8>? = nil
@@ -653,8 +656,8 @@ private var nread: Int               /* # bytes read in various scenarios */
 private var delegate: http_parser_delegate? = nil
 
 public var content_length: UInt64    /* # bytes in body (0 if no Content-Length header) */
-public var http_major: Int16
-public var http_minor: Int16
+public var http_major: UInt16
+public var http_minor: UInt16
 public var status_code: UInt         /* responses only */
 public var method: http_method       /* requests only */
 public var http_errno: http_errno
@@ -1056,7 +1059,7 @@ public func execute (_ settings: http_parser_delegate,
         /* Use of CALLBACK_NOTIFY() here would erroneously return 1 byte read if
          * we got paused.
          */
-        CALLBACK_NOTIFY_NOADVANCE(p_state, .message_complete)
+        if CALLBACK_NOTIFY(p_state, .message_complete) { return p - data } // CALLBACK_NOTIFY_NOADVANCE
         return 0
 
       case .s_dead,
@@ -1130,7 +1133,7 @@ public func execute (_ settings: http_parser_delegate,
         if (ch == ASCII_H) {
           p_state = .s_res_or_resp_H
 
-          CALLBACK_NOTIFY(p_state, .message_begin)
+          if CALLBACK_NOTIFY(p_state, .message_begin) { return  p - data + 1 }
         } else {
           self.type = .HTTP_REQUEST
           p_state = .s_start_req
@@ -1172,7 +1175,7 @@ public func execute (_ settings: http_parser_delegate,
             try SET_ERRNO(.HPE_INVALID_CONSTANT)
         }
 
-        CALLBACK_NOTIFY(p_state, .message_begin)
+        if CALLBACK_NOTIFY(p_state, .message_begin) { return  p - data + 1 }
         break
 
       case .s_res_H:
@@ -1200,7 +1203,7 @@ public func execute (_ settings: http_parser_delegate,
           try SET_ERRNO(.HPE_INVALID_VERSION)
         }
 
-        self.http_major = Int16(ch) - Int16(ASCII_0)
+        self.http_major = UInt16(ch) - UInt16(ASCII_0)
         p_state = .s_res_http_major
         break
 
@@ -1216,7 +1219,7 @@ public func execute (_ settings: http_parser_delegate,
         }
 
         self.http_major *= 10
-        self.http_major += Int16(ch) - Int16(ASCII_0)
+        self.http_major += UInt16(ch) - UInt16(ASCII_0)
 
         if (UNLIKELY(self.http_major > 999)) {
           try SET_ERRNO(.HPE_INVALID_VERSION)
@@ -1230,7 +1233,7 @@ public func execute (_ settings: http_parser_delegate,
           try SET_ERRNO(.HPE_INVALID_VERSION)
         }
 
-        self.http_minor = Int16(ch) - Int16(ASCII_0)
+        self.http_minor = UInt16(ch) - UInt16(ASCII_0)
         p_state = .s_res_http_minor
         break
 
@@ -1246,7 +1249,7 @@ public func execute (_ settings: http_parser_delegate,
         }
 
         self.http_minor *= 10
-        self.http_minor += Int16(ch) - Int16(ASCII_0)
+        self.http_minor += UInt16(ch) - UInt16(ASCII_0)
 
         if (UNLIKELY(self.http_minor > 999)) {
           try SET_ERRNO(.HPE_INVALID_VERSION)
@@ -1314,13 +1317,13 @@ public func execute (_ settings: http_parser_delegate,
       case .s_res_status:
         if (ch == CR) {
           p_state = .s_res_line_almost_done
-          CALLBACK_DATA(p_state, p, .status)
+          if CALLBACK_DATA(p_state, p, .status) { return p - data + 1 }
           break
         }
 
         if (ch == LF) {
           p_state = .s_header_field_start
-          CALLBACK_DATA(p_state, p, .status)
+          if CALLBACK_DATA(p_state, p, .status) { return p - data + 1 }
           break
         }
 
@@ -1367,7 +1370,7 @@ public func execute (_ settings: http_parser_delegate,
         }
         p_state = .s_req_method
 
-        CALLBACK_NOTIFY(p_state, .message_begin)
+        if CALLBACK_NOTIFY(p_state, .message_begin) { return  p - data + 1 }
 
         break
 
@@ -1466,7 +1469,7 @@ public func execute (_ settings: http_parser_delegate,
         switch (ch) {
           case ASCII_SPACE:
             p_state = .s_req_http_start
-            CALLBACK_DATA(p_state, p, .url)
+            if CALLBACK_DATA(p_state, p, .url) { return p - data + 1 }
             break
           case CR,
                LF:
@@ -1475,7 +1478,7 @@ public func execute (_ settings: http_parser_delegate,
             p_state = (ch == CR) ?
               .s_req_line_almost_done :
               .s_header_field_start
-            CALLBACK_DATA(p_state, p, .url)
+            if CALLBACK_DATA(p_state, p, .url) { return p - data + 1 }
             break
           default:
             p_state = parse_url_char(p_state, ch)
@@ -1523,7 +1526,7 @@ public func execute (_ settings: http_parser_delegate,
           try SET_ERRNO(.HPE_INVALID_VERSION)
         }
 
-        self.http_major = Int16(ch) - Int16(ASCII_0)
+        self.http_major = UInt16(ch) - UInt16(ASCII_0)
         p_state = .s_req_http_major
         break
 
@@ -1539,7 +1542,7 @@ public func execute (_ settings: http_parser_delegate,
         }
 
         self.http_major *= 10
-        self.http_major += Int16(ch) - Int16(ASCII_0)
+        self.http_major += UInt16(ch) - UInt16(ASCII_0)
 
         if (UNLIKELY(self.http_major > 999)) {
           try SET_ERRNO(.HPE_INVALID_VERSION)
@@ -1553,7 +1556,7 @@ public func execute (_ settings: http_parser_delegate,
           try SET_ERRNO(.HPE_INVALID_VERSION)
         }
 
-        self.http_minor = Int16(ch) - Int16(ASCII_0)
+        self.http_minor = UInt16(ch) - UInt16(ASCII_0)
         p_state = .s_req_http_minor
         break
 
@@ -1576,7 +1579,7 @@ public func execute (_ settings: http_parser_delegate,
         }
 
         self.http_minor *= 10
-        self.http_minor += Int16(ch) - Int16(ASCII_0)
+        self.http_minor += UInt16(ch) - UInt16(ASCII_0)
 
         if (UNLIKELY(self.http_minor > 999)) {
           try SET_ERRNO(.HPE_INVALID_VERSION)
@@ -1767,7 +1770,7 @@ public func execute (_ settings: http_parser_delegate,
 
         if (ch == ASCII_COLON) {
           p_state = .s_header_value_discard_ws
-          CALLBACK_DATA(p_state, p, .header_field)
+          if CALLBACK_DATA(p_state, p, .header_field) { return p - data + 1 }
           break
         }
 
@@ -1852,7 +1855,7 @@ public func execute (_ settings: http_parser_delegate,
           if (ch == CR) {
             p_state = .s_header_almost_done
             self.header_state = h_state
-            CALLBACK_DATA(p_state, p, .header_value)
+            if CALLBACK_DATA(p_state, p, .header_value) { return p - data + 1 }
             break
           }
 
@@ -1860,7 +1863,7 @@ public func execute (_ settings: http_parser_delegate,
             p_state = .s_header_almost_done
             try COUNT_HEADER_SIZE(p - start)
             self.header_state = h_state
-            CALLBACK_DATA_NOADVANCE(p_state, p, .header_value)
+            if CALLBACK_DATA(p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
             continue
           }
 
@@ -2090,7 +2093,7 @@ public func execute (_ settings: http_parser_delegate,
           /* header value was empty */
           MARK(.header_value, p)
           p_state = .s_header_field_start
-          CALLBACK_DATA_NOADVANCE(p_state, p, .header_value)
+          if CALLBACK_DATA(p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
           continue
         }
 
@@ -2100,7 +2103,7 @@ public func execute (_ settings: http_parser_delegate,
         if (self.flags & F_TRAILING) != 0 {
           /* End of a chunked request */
           p_state = .s_message_done
-          CALLBACK_NOTIFY_NOADVANCE(p_state, .chunk_complete)
+          if CALLBACK_NOTIFY(p_state, .chunk_complete) { return p - data } // CALLBACK_NOTIFY_NOADVANCE
           continue
         }
 
@@ -2168,14 +2171,14 @@ public func execute (_ settings: http_parser_delegate,
                                 (self.flags & F_SKIPBODY) != 0 || !hasBody)) {
           /* Exit, the rest of the message is in a different protocol. */
           p_state = NEW_MESSAGE()
-          CALLBACK_NOTIFY(p_state, .message_complete)
+          if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
           self.state = p_state
           return((p - data) + 1)
         }
 
         if (self.flags & F_SKIPBODY) != 0 {
           p_state = NEW_MESSAGE()
-          CALLBACK_NOTIFY(p_state, .message_complete)
+          if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
         } else if (self.flags & F_CHUNKED != 0) {
           /* chunked encoding - ignore Content-Length header */
           p_state = .s_chunk_size_start
@@ -2183,7 +2186,7 @@ public func execute (_ settings: http_parser_delegate,
           if (self.content_length == 0) {
             /* Content-Length header given but zero: Content-Length: 0\r\n */
             p_state = NEW_MESSAGE()
-            CALLBACK_NOTIFY(p_state, .message_complete)
+            if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
           } else if (self.content_length != ULLONG_MAX) {
             /* Content-Length header given and non-zero */
             p_state = .s_body_identity
@@ -2191,7 +2194,7 @@ public func execute (_ settings: http_parser_delegate,
             if (!http_message_needs_eof()) {
               /* Assume content-length 0 - read the next */
               p_state = NEW_MESSAGE()
-              CALLBACK_NOTIFY(p_state, .message_complete)
+              if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
             } else {
               /* Read body until EOF */
               p_state = .s_body_identity_eof
@@ -2229,7 +2232,7 @@ public func execute (_ settings: http_parser_delegate,
            * complete-on-length. It's not clear that this distinction is
            * important for applications, but let's keep it for now.
            */
-          CALLBACK_DATA_(p_state, p, .body, p - body_mark! + 1)     // TODO!!!!
+          if CALLBACK_DATA_(p_state, p, .body, p - body_mark! + 1) { return p - data }
           continue
         }
 
@@ -2244,7 +2247,7 @@ public func execute (_ settings: http_parser_delegate,
 
       case .s_message_done:
         p_state = NEW_MESSAGE()
-        CALLBACK_NOTIFY(p_state, .message_complete)
+        if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
         if (self.upgrade) {
           /* Exit, the rest of the message is in a different protocol. */
           self.state = p_state
@@ -2319,7 +2322,7 @@ public func execute (_ settings: http_parser_delegate,
         } else {
           p_state = .s_chunk_data
         }
-        CALLBACK_NOTIFY(p_state, .chunk_header)
+        if CALLBACK_NOTIFY(p_state, .chunk_header) { return  p - data + 1 }
         break
 
       case .s_chunk_data:
@@ -2348,7 +2351,7 @@ public func execute (_ settings: http_parser_delegate,
         assert(self.content_length == 0)
         try STRICT_CHECK(ch != CR)
         p_state = .s_chunk_data_done
-        CALLBACK_DATA(p_state, p, .body)
+        if CALLBACK_DATA(p_state, p, .body) { return p - data + 1 }
         break
 
       case .s_chunk_data_done:
@@ -2356,7 +2359,7 @@ public func execute (_ settings: http_parser_delegate,
         try STRICT_CHECK(ch != LF)
         self.nread = 0
         p_state = .s_chunk_size_start
-        CALLBACK_NOTIFY(p_state, .chunk_complete)
+        if CALLBACK_NOTIFY(p_state, .chunk_complete) { return  p - data + 1 }
         break
 
       // not needed since Swift will warn us of any unhandled state
@@ -2384,11 +2387,11 @@ public func execute (_ settings: http_parser_delegate,
           (body_mark != nil ? 1 : 0) +
           (status_mark != nil ? 1 : 0)) <= 1)
 
-  CALLBACK_DATA_NOADVANCE(p_state, p, .header_field)
-  CALLBACK_DATA_NOADVANCE(p_state, p, .header_value)
-  CALLBACK_DATA_NOADVANCE(p_state, p, .url)
-  CALLBACK_DATA_NOADVANCE(p_state, p, .body)
-  CALLBACK_DATA_NOADVANCE(p_state, p, .status)
+  if CALLBACK_DATA(p_state, p, .header_field) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(p_state, p, .url) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(p_state, p, .body) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(p_state, p, .status) { return p - data } // CALLBACK_DATA_NOADVANCE
 
   self.state = p_state
   return(len)

@@ -26,6 +26,5 @@ import XCTest
 
 
 XCTMain([
-    testCase(BenchmarkTests.allTests),
     testCase(ParserTests.allTests)
 ])

@@ -32,9 +32,9 @@ import Foundation
 import XCTest
 
 let MAX_HEADERS = 13
-let MAX_ELEMENT_SIZE = 2048
+//let MAX_ELEMENT_SIZE = 2048
 let MAX_CHUNKS = 16
-
+let MAX_MESSAGE_TESTS = 5
 
 var parser: http_parser? = nil
 
@@ -46,20 +46,10 @@ struct message {
   var name = "" // for debugging purposes
   var type:http_parser_type = .HTTP_REQUEST
   var raw = ""
-  //var status_code = 0
-  //var response_status = ""
-  //var body_size = 0
   //var host = ""
   //var userinfo = ""
   //var port:UInt16 = 0
-  enum last_header_element:Int { case NONE = 0, FIELD, VALUE }
-  var should_keep_alive: Bool
-
-  //var num_chunks = 0
-  //var num_chunks_complete = 0
-  //var chunk_lengths = [Int]()    // MAX_CHUNKS
-
-  //var upgrade = "" // upgraded body
+  var should_keep_alive: Bool = false
 
   var message_complete_on_eof: Bool = false
   var http_major:UInt16 = 0
@@ -70,16 +60,28 @@ struct message {
   var request_path = ""
   var request_url = ""
   var num_headers = 0
-  var headers = [[String:String]]()
+  var upgrade = "" // upgraded body
+  var headers = [[String]]()
   var body = ""
 }
 
+enum last_header_element:Int { case NONE = 0, FIELD, VALUE }
+
 struct message_result {
 
+  var status_code = 0
+  var response_status = ""
+  var body_size = 0
+
+  var last_header_element:last_header_element = .NONE
   var message_begin_cb_called: Bool = false
   var headers_complete_cb_called: Bool = false
   var message_complete_cb_called: Bool = false
   var body_is_final: Bool = false
+  
+  var num_chunks = 0
+  var num_chunks_complete = 0
+  var chunk_lengths = [UInt64]()    // MAX_CHUNKS
 }
 
 var currently_parsing_eof = false
@@ -114,38 +116,41 @@ requests.append(message(
   ,request_path: "/test"
   ,request_url: "/test"
   ,num_headers: 3
+  ,upgrade: ""
   ,headers:
-    [ [ "User-Agent": "curl/7.18.0 (i486-pc-linux-gnu) libcurl/7.18.0 OpenSSL/0.9.8g zlib/1.2.3.3 libidn/1.1" ]
-    , [ "Host": "0.0.0.0=5000" ]
-    , [ "Accept": "*/*" ]
+    [ [ "User-Agent", "curl/7.18.0 (i486-pc-linux-gnu) libcurl/7.18.0 OpenSSL/0.9.8g zlib/1.2.3.3 libidn/1.1" ]
+    , [ "Host", "0.0.0.0=5000" ]
+    , [ "Accept", "*/*" ]
     ]
    ,body: ""
   ))
-/*
+
 //#define FIREFOX_GET 1
-, {.name = "firefox get"
-  .type = .HTTP_REQUEST
-  .raw = "GET /favicon.ico HTTP/1.1\r\n"
-         "Host: 0.0.0.0=5000\r\n"
-         "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n"
-         "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,REPLACE_WITH_ASTERISK_SLASH_ASTERISK;q=0.8\r\n"
-         "Accept-Language: en-us,en;q=0.5\r\n"
-         "Accept-Encoding: gzip,deflate\r\n"
-         "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n"
-         "Keep-Alive: 300\r\n"
-         "Connection: keep-alive\r\n"
+requests.append(message(
+  name: "firefox get"
+  ,type: .HTTP_REQUEST
+  ,raw: "GET /favicon.ico HTTP/1.1\r\n" +
+         "Host: 0.0.0.0=5000\r\n" +
+         "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n" +
+         "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,REPLACE_WITH_ASTERISK_SLASH_ASTERISK;q=0.8\r\n" +
+         "Accept-Language: en-us,en;q=0.5\r\n" +
+         "Accept-Encoding: gzip,deflate\r\n" +
+         "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n" +
+         "Keep-Alive: 300\r\n" +
+         "Connection: keep-alive\r\n" +
          "\r\n"
-  .should_keep_alive = true
-  .message_complete_on_eof = false
-  .http_major = 1
-  .http_minor = 1
-  .method = HTTP_GET
-  .query_string = ""
-  .fragment = ""
-  .request_path = "/favicon.ico"
-  .request_url = "/favicon.ico"
-  .num_headers = 8
-  .headers =
+  ,should_keep_alive: true
+  ,message_complete_on_eof: false
+  ,http_major: 1
+  ,http_minor: 1
+  ,method: .HTTP_GET
+  ,query_string: ""
+  ,fragment: ""
+  ,request_path: "/favicon.ico"
+  ,request_url: "/favicon.ico"
+  ,num_headers: 8
+  ,upgrade: ""
+  ,headers:
     [ [ "Host", "0.0.0.0=5000" ]
     , [ "User-Agent", "Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0" ]
     , [ "Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,REPLACE_WITH_ASTERISK_SLASH_ASTERISK;q=0.8" ]
@@ -155,9 +160,9 @@ requests.append(message(
     , [ "Keep-Alive", "300" ]
     , [ "Connection", "keep-alive" ]
     ]
-  .body = ""
-  }
-
+  ,body: ""
+  ))
+/*
 #define DUMBFUCK 2
 , {.name= "dumbfuck"
   ,.type= HTTP_REQUEST
@@ -1756,49 +1761,6 @@ const struct message responses[] =
 , {.name= NULL } /* sentinel */
 };
 
-/* strnlen() is a POSIX.2008 addition. Can't rely on it being available so
- * define it ourselves.
- */
-size_t
-strnlen(const char *s, size_t maxlen)
-{
-  const char *p;
-
-  p = memchr(s, '\0', maxlen);
-  if (p == NULL)
-    return maxlen;
-
-  return p - s;
-}
-
-size_t
-strlncat(char *dst, size_t len, const char *src, size_t n)
-{
-  size_t slen;
-  size_t dlen;
-  size_t rlen;
-  size_t ncpy;
-
-  slen = strnlen(src, n);
-  dlen = strnlen(dst, len);
-
-  if (dlen < len) {
-    rlen = len - dlen;
-    ncpy = slen < rlen ? slen : (rlen - 1);
-    memcpy(dst + dlen, src, ncpy);
-    dst[dlen + ncpy] = '\0';
-  }
-
-  assert(len > slen + dlen);
-  return slen + dlen;
-}
-
-size_t
-strlcat(char *dst, const char *src, size_t len)
-{
-  return strlncat(dst, len, src, (size_t) -1);
-}
-
 size_t
 strlncpy(char *dst, size_t len, const char *src, size_t n)
 {
@@ -1816,440 +1778,407 @@ strlncpy(char *dst, size_t len, const char *src, size_t n)
   assert(len > slen);
   return slen;
 }
-
-size_t
-strlcpy(char *dst, const char *src, size_t len)
-{
-  return strlncpy(dst, len, src, (size_t) -1);
-}
-
-int
-request_url_cb (http_parser *p, const char *buf, size_t len)
-{
-  assert(p == parser);
-  strlncat(messages[num_messages].request_url,
-           sizeof(messages[num_messages].request_url),
-           buf,
-           len);
-  return 0;
-}
-
-int
-header_field_cb (http_parser *p, const char *buf, size_t len)
-{
-  assert(p == parser);
-  struct message *m = &messages[num_messages];
-
-  if (m->last_header_element != FIELD)
-    m->num_headers++;
-
-  strlncat(m->headers[m->num_headers-1][0],
-           sizeof(m->headers[m->num_headers-1][0]),
-           buf,
-           len);
-
-  m->last_header_element = FIELD;
-
-  return 0;
-}
-
-int
-header_value_cb (http_parser *p, const char *buf, size_t len)
-{
-  assert(p == parser);
-  struct message *m = &messages[num_messages];
-
-  strlncat(m->headers[m->num_headers-1][1],
-           sizeof(m->headers[m->num_headers-1][1]),
-           buf,
-           len);
-
-  m->last_header_element = VALUE;
-
-  return 0;
-}
-
-void
-check_body_is_final (const http_parser *p)
-{
-  if (messages[num_messages].body_is_final) {
-    fprintf(stderr, "\n\n *** Error http_body_is_final() should return 1 "
-                    "on last on_body callback call "
-                    "but it doesn't! ***\n\n");
-    assert(0);
-    abort();
-  }
-  messages[num_messages].body_is_final = http_body_is_final(p);
-}
-
-int
-body_cb (http_parser *p, const char *buf, size_t len)
-{
-  assert(p == parser);
-  strlncat(messages[num_messages].body,
-           sizeof(messages[num_messages].body),
-           buf,
-           len);
-  messages[num_messages].body_size += len;
-  check_body_is_final(p);
- // printf("body_cb: '%s'\n", requests[num_messages].body);
-  return 0;
-}
-
-int
-count_body_cb (http_parser *p, const char *buf, size_t len)
-{
-  assert(p == parser);
-  assert(buf);
-  messages[num_messages].body_size += len;
-  check_body_is_final(p);
-  return 0;
-}
 */
+
+func callbackString(_ at: UnsafePointer<UInt8>, _ length: Int) -> String {
+  let data = Data(bytes: at, count: length)
+  return String(data: data, encoding: String.Encoding.utf8)!
+}
+
+func request_url_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
+{
+  messages[num_messages].request_url += callbackString(buf, len)
+  return 0
+}
+
+func header_field_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
+{
+  if (message_results[num_messages].last_header_element != .FIELD) {
+    messages[num_messages].num_headers += 1
+  }
+  
+  if messages[num_messages].headers.count == 0 {
+    for _ in 0..<MAX_HEADERS {
+       messages[num_messages].headers.append([String](repeating: "", count: 2))
+    }
+  }
+
+  messages[num_messages].headers[messages[num_messages].num_headers-1][0] += callbackString(buf, len)
+
+  message_results[num_messages].last_header_element = .FIELD
+
+  return 0
+}
+
+func header_value_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
+{
+  messages[num_messages].headers[messages[num_messages].num_headers-1][1] += callbackString(buf, len)
+
+  message_results[num_messages].last_header_element = .VALUE
+
+  return 0
+}
+
+func check_body_is_final ()
+{
+  if (message_results[num_messages].body_is_final) {
+    print("\n\n *** Error http_body_is_final() should return 1 " +
+                    "on last on_body callback call " +
+                    "but it doesn't! ***\n\n")
+    XCTFail()
+  }
+  message_results[num_messages].body_is_final = parser!.body_is_final()
+}
+
+func body_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
+{
+  messages[num_messages].body += callbackString(buf, len)
+  message_results[num_messages].body_size += len
+  check_body_is_final()
+  //print("body_cb: \(messages[num_messages].body)")
+  return 0
+}
+
+func count_body_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
+{
+  message_results[num_messages].body_size += len
+  check_body_is_final()
+  return 0
+}
+
 func message_begin_cb () -> Int
 {
-  //assert(p == parser);
   message_results[num_messages].message_begin_cb_called = true
   return 0
 }
-/*
-int
-headers_complete_cb (http_parser *p)
+
+func headers_complete_cb () -> Int
 {
-  assert(p == parser);
-  messages[num_messages].method = parser->method;
-  messages[num_messages].status_code = parser->status_code;
-  messages[num_messages].http_major = parser->http_major;
-  messages[num_messages].http_minor = parser->http_minor;
-  messages[num_messages].headers_complete_cb_called = TRUE;
-  messages[num_messages].should_keep_alive = http_should_keep_alive(parser);
-  return 0;
+  messages[num_messages].method = parser!.method
+  //messages[num_messages].status_code = parser!.status_code
+  messages[num_messages].http_major = parser!.http_major
+  messages[num_messages].http_minor = parser!.http_minor
+  message_results[num_messages].headers_complete_cb_called = true
+  messages[num_messages].should_keep_alive = parser!.should_keep_alive()
+  return 0
 }
 
-int
-message_complete_cb (http_parser *p)
+func message_complete_cb () -> Int
 {
-  assert(p == parser);
-  if (messages[num_messages].should_keep_alive != http_should_keep_alive(parser))
+  if (messages[num_messages].should_keep_alive != parser!.should_keep_alive())
   {
-    fprintf(stderr, "\n\n *** Error http_should_keep_alive() should have same "
-                    "value in both on_message_complete and on_headers_complete "
-                    "but it doesn't! ***\n\n");
-    assert(0);
-    abort();
+    print("\n\n *** Error http_should_keep_alive() should have same " +
+                    "value in both on_message_complete and on_headers_complete " +
+                    "but it doesn't! ***\n\n")
+    XCTFail()
   }
 
-  if (messages[num_messages].body_size &&
-      http_body_is_final(p) &&
+  /*if (messages[num_messages].body_size &&
+      parser!.body_is_final() &&
       !messages[num_messages].body_is_final)
   {
-    fprintf(stderr, "\n\n *** Error http_body_is_final() should return 1 "
-                    "on last on_body callback call "
-                    "but it doesn't! ***\n\n");
-    assert(0);
-    abort();
-  }
+    print("\n\n *** Error http_body_is_final() should return 1 " +
+                    "on last on_body callback call " +
+                    "but it doesn't! ***\n\n")
+   XCTFail()
+  }*/
 
-  messages[num_messages].message_complete_cb_called = TRUE;
+  message_results[num_messages].message_complete_cb_called = true
 
   messages[num_messages].message_complete_on_eof = currently_parsing_eof;
 
-  num_messages++;
+  num_messages += 1
   return 0;
 }
 
-int
-response_status_cb (http_parser *p, const char *buf, size_t len)
+func response_status_cb (_ buf: UnsafePointer<UInt8>, _ length: Int) -> Int
 {
-  assert(p == parser);
-  strlncat(messages[num_messages].response_status,
-           sizeof(messages[num_messages].response_status),
-           buf,
-           len);
-  return 0;
+  message_results[num_messages].response_status += callbackString(buf, length)
+  return 0
 }
 
-int
-chunk_header_cb (http_parser *p)
+func chunk_header_cb () ->Int
 {
-  assert(p == parser);
-  int chunk_idx = messages[num_messages].num_chunks;
-  messages[num_messages].num_chunks++;
+  let chunk_idx = message_results[num_messages].num_chunks
+  message_results[num_messages].num_chunks += 1
   if (chunk_idx < MAX_CHUNKS) {
-    messages[num_messages].chunk_lengths[chunk_idx] = p->content_length;
+    message_results[num_messages].chunk_lengths[chunk_idx] = parser!.content_length
   }
 
   return 0;
 }
 
-int
-chunk_complete_cb (http_parser *p)
+func chunk_complete_cb () ->Int
 {
-  assert(p == parser);
-
   /* Here we want to verify that each chunk_header_cb is matched by a
    * chunk_complete_cb, so not only should the total number of calls to
    * both callbacks be the same, but they also should be interleaved
    * properly */
-  assert(messages[num_messages].num_chunks ==
-         messages[num_messages].num_chunks_complete + 1);
+  XCTAssertTrue(message_results[num_messages].num_chunks ==
+         message_results[num_messages].num_chunks_complete + 1)
 
-  messages[num_messages].num_chunks_complete++;
-  return 0;
+  message_results[num_messages].num_chunks_complete += 1
+  return 0
 }
 
 /* These dontcall_* callbacks exist so that we can verify that when we're
  * paused, no additional callbacks are invoked */
-int
-dontcall_message_begin_cb (http_parser *p)
+func dontcall_message_begin_cb () -> Int
 {
-  if (p) { } // gcc
-  fprintf(stderr, "\n\n*** on_message_begin() called on paused parser ***\n\n");
-  abort();
+  print("\n\n*** on_message_begin() called on paused parser ***\n\n");
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_header_field_cb (http_parser *p, const char *buf, size_t len)
+func dontcall_header_field_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  if (p || buf || len) { } // gcc
-  fprintf(stderr, "\n\n*** on_header_field() called on paused parser ***\n\n");
-  abort();
+  print("\n\n*** on_header_field() called on paused parser ***\n\n")
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_header_value_cb (http_parser *p, const char *buf, size_t len)
+func dontcall_header_value_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  if (p || buf || len) { } // gcc
-  fprintf(stderr, "\n\n*** on_header_value() called on paused parser ***\n\n");
-  abort();
+  print("\n\n*** on_header_value() called on paused parser ***\n\n")
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_request_url_cb (http_parser *p, const char *buf, size_t len)
+func dontcall_request_url_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  if (p || buf || len) { } // gcc
-  fprintf(stderr, "\n\n*** on_request_url() called on paused parser ***\n\n");
-  abort();
+  print("\n\n*** on_request_url() called on paused parser ***\n\n")
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_body_cb (http_parser *p, const char *buf, size_t len)
+func dontcall_body_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  if (p || buf || len) { } // gcc
-  fprintf(stderr, "\n\n*** on_body_cb() called on paused parser ***\n\n");
-  abort();
+  print("\n\n*** on_body_cb() called on paused parser ***\n\n")
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_headers_complete_cb (http_parser *p)
+func dontcall_headers_complete_cb () -> Int
 {
-  if (p) { } // gcc
-  fprintf(stderr, "\n\n*** on_headers_complete() called on paused "
-                  "parser ***\n\n");
-  abort();
+  print("\n\n*** on_headers_complete() called on paused parser ***\n\n")
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_message_complete_cb (http_parser *p)
+func dontcall_message_complete_cb () -> Int
 {
-  if (p) { } // gcc
-  fprintf(stderr, "\n\n*** on_message_complete() called on paused "
-                  "parser ***\n\n");
-  abort();
+  print("\n\n*** on_message_complete() called on paused parser ***\n\n");
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_response_status_cb (http_parser *p, const char *buf, size_t len)
+func dontcall_response_status_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  if (p || buf || len) { } // gcc
-  fprintf(stderr, "\n\n*** on_status() called on paused parser ***\n\n");
-  abort();
+  print("\n\n*** on_status() called on paused parser ***\n\n")
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_chunk_header_cb (http_parser *p)
+func dontcall_chunk_header_cb () -> Int
 {
-  if (p) { } // gcc
-  fprintf(stderr, "\n\n*** on_chunk_header() called on paused parser ***\n\n");
-  exit(1);
+  print("\n\n*** on_chunk_header() called on paused parser ***\n\n")
+  XCTFail()
+  return 0
 }
 
-int
-dontcall_chunk_complete_cb (http_parser *p)
+func dontcall_chunk_complete_cb () -> Int
 {
-  if (p) { } // gcc
-  fprintf(stderr, "\n\n*** on_chunk_complete() "
-          "called on paused parser ***\n\n");
-  exit(1);
+  print("\n\n*** on_chunk_complete() called on paused parser ***\n\n")
+  XCTFail()
+  return 0
 }
 
-static http_parser_settings settings_dontcall =
-  {.on_message_begin = dontcall_message_begin_cb
-  ,.on_header_field = dontcall_header_field_cb
-  ,.on_header_value = dontcall_header_value_cb
-  ,.on_url = dontcall_request_url_cb
-  ,.on_status = dontcall_response_status_cb
-  ,.on_body = dontcall_body_cb
-  ,.on_headers_complete = dontcall_headers_complete_cb
-  ,.on_message_complete = dontcall_message_complete_cb
-  ,.on_chunk_header = dontcall_chunk_header_cb
-  ,.on_chunk_complete = dontcall_chunk_complete_cb
-  };
+class settings_dontcall : http_parser_delegate {
+  
+  func on_message_begin() -> Int {
+    return dontcall_message_begin_cb()
+  }
+  func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return dontcall_header_field_cb(at, length)
+  }
+  func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return dontcall_header_value_cb(at, length)
+  }
+  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return dontcall_request_url_cb(at, length)
+  }
+  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return dontcall_response_status_cb(at, length)
+  }
+  func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return dontcall_body_cb(at, length)
+  }
+  func on_headers_complete() -> Int {
+    return dontcall_headers_complete_cb()
+  }
+  func on_message_complete() -> Int {
+    return dontcall_message_complete_cb()
+  }
+  func on_chunk_header() -> Int {
+    return dontcall_chunk_header_cb()
+  }
+  func on_chunk_complete() -> Int {
+    return dontcall_chunk_complete_cb()
+  }
+}
 
 /* These pause_* callbacks always pause the parser and just invoke the regular
  * callback that tracks content. Before returning, we overwrite the parser
  * settings to point to the _dontcall variety so that we can verify that
  * the pause actually did, you know, pause. */
-int
-pause_message_begin_cb (http_parser *p)
+func pause_message_begin_cb () -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return message_begin_cb(p);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return message_begin_cb()
 }
 
-int
-pause_header_field_cb (http_parser *p, const char *buf, size_t len)
+func pause_header_field_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return header_field_cb(p, buf, len);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return header_field_cb(buf, len)
 }
 
-int
-pause_header_value_cb (http_parser *p, const char *buf, size_t len)
+func pause_header_value_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return header_value_cb(p, buf, len);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return header_value_cb(buf, len)
 }
 
-int
-pause_request_url_cb (http_parser *p, const char *buf, size_t len)
+func pause_request_url_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return request_url_cb(p, buf, len);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return request_url_cb(buf, len)
 }
 
-int
-pause_body_cb (http_parser *p, const char *buf, size_t len)
+func pause_body_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return body_cb(p, buf, len);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return body_cb(buf, len)
 }
 
-int
-pause_headers_complete_cb (http_parser *p)
+func pause_headers_complete_cb () -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return headers_complete_cb(p);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return headers_complete_cb()
 }
 
-int
-pause_message_complete_cb (http_parser *p)
+func pause_message_complete_cb () -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return message_complete_cb(p);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return message_complete_cb()
 }
 
-int
-pause_response_status_cb (http_parser *p, const char *buf, size_t len)
+func pause_response_status_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return response_status_cb(p, buf, len);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return response_status_cb(buf, len)
 }
 
-int
-pause_chunk_header_cb (http_parser *p)
+func pause_chunk_header_cb () -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return chunk_header_cb(p);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return chunk_header_cb()
 }
 
-int
-pause_chunk_complete_cb (http_parser *p)
+func pause_chunk_complete_cb () -> Int
 {
-  http_parser_pause(p, 1);
-  *current_pause_parser = settings_dontcall;
-  return chunk_complete_cb(p);
+  parser!.pause(true)
+  current_pause_parser = settings_dontcall()
+  return chunk_complete_cb()
 }
 
-int
-connect_headers_complete_cb (http_parser *p)
+func connect_headers_complete_cb () -> Int
 {
-  headers_complete_cb(p);
-  return 1;
+  let _ = headers_complete_cb()
+  return 1
 }
 
-int
-connect_message_complete_cb (http_parser *p)
+func connect_message_complete_cb () -> Int
 {
-  messages[num_messages].should_keep_alive = http_should_keep_alive(parser);
-  return message_complete_cb(p);
+  messages[num_messages].should_keep_alive = parser!.should_keep_alive()
+  return message_complete_cb()
 }
 
-static http_parser_settings settings_pause =
-  {.on_message_begin = pause_message_begin_cb
-  ,.on_header_field = pause_header_field_cb
-  ,.on_header_value = pause_header_value_cb
-  ,.on_url = pause_request_url_cb
-  ,.on_status = pause_response_status_cb
-  ,.on_body = pause_body_cb
-  ,.on_headers_complete = pause_headers_complete_cb
-  ,.on_message_complete = pause_message_complete_cb
-  ,.on_chunk_header = pause_chunk_header_cb
-  ,.on_chunk_complete = pause_chunk_complete_cb
-  };
-*/
+class settings_pause : http_parser_delegate {
+
+  func on_message_begin() -> Int {
+    return pause_message_begin_cb()
+  }
+  func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return pause_header_field_cb(at, length)
+  }
+  func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return pause_header_value_cb(at, length)
+  }
+  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return pause_request_url_cb(at, length)
+  }
+  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return pause_response_status_cb(at, length)
+  }
+  func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return pause_body_cb(at, length)
+  }
+  func on_headers_complete() -> Int {
+    return pause_headers_complete_cb()
+  }
+  func on_message_complete() -> Int {
+    return pause_message_complete_cb()
+  }
+  func on_chunk_header() -> Int {
+    return pause_chunk_header_cb()
+  }
+  func on_chunk_complete() -> Int {
+    return pause_chunk_complete_cb()
+  }
+}
+
 class settings : http_parser_delegate {
-  /*on_message_begin = message_begin_cb
-  on_header_field = header_field_cb
-  on_header_value = header_value_cb
-  on_url = request_url_cb
-  on_status = response_status_cb
-  on_body = body_cb
-  on_headers_complete = headers_complete_cb
-  on_message_complete = message_complete_cb
-  on_chunk_header = chunk_header_cb
-  on_chunk_complete = chunk_complete_cb*/
 
   func on_message_begin() -> Int {
     return message_begin_cb()
   }
-  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
-  }
-  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
-  }
   func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
+    return header_field_cb(at, length)
   }
   func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
+    return header_value_cb(at, length)
   }
-  func on_headers_complete() -> Int {
-    return 0
+  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return request_url_cb(at, length)
+  }
+  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    return response_status_cb(at, length)
   }
   func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
+    return body_cb(at, length)
+  }
+  func on_headers_complete() -> Int {
+    return headers_complete_cb()
   }
   func on_message_complete() -> Int {
-    return 0
+    return message_complete_cb()
   }
   func on_chunk_header() -> Int {
-    return 0
+    return chunk_header_cb()
   }
   func on_chunk_complete() -> Int {
-    return 0
+    return chunk_complete_cb()
   }
-
 }
 /*
 static http_parser_settings settings_count_body =
@@ -2301,7 +2230,7 @@ func parser_init (_ type: http_parser_type)
 
   parser?.reset(type)
 
-  messages = []
+  messages = [message](repeating: message(), count: MAX_MESSAGE_TESTS)
 
 }
 
@@ -2320,25 +2249,11 @@ func parse (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 }
 
 @discardableResult
-func parse (string: String, _ len: Int) -> Int
+func parse (string: String) -> Int
 {
-  var nparsed = 0
-  currently_parsing_eof = (len == 0)
-
-  #if os(Linux)
-    // Linux String.data() still returns nil on an empty string
-  let httpData = string.data(using: NSUTF8StringEncoding) ?? NSData()
-  nparsed = parser!.execute(settings(), UnsafePointer<UInt8>(httpData.bytes), httpData.length)
-
-  #else
-  let httpData = string.data(using: String.Encoding.utf8)!
-  httpData.withUnsafeBytes {(bytes: UnsafePointer<UInt8>) -> Void in
-    nparsed = parser!.execute(settings(), bytes, len)
-  }
-  #endif
-
-  return nparsed
+  return parse(string, string.utf8.count)
 }
+
 /*
 size_t parse_count_body (const char *buf, size_t len)
 {
@@ -2347,18 +2262,18 @@ size_t parse_count_body (const char *buf, size_t len)
   nparsed = http_parser_execute(parser, &settings_count_body, buf, len);
   return nparsed;
 }
-
-size_t parse_pause (const char *buf, size_t len)
+*/
+func parse_pause (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  size_t nparsed;
-  http_parser_settings s = settings_pause;
+  var nparsed = 0
+  let s = settings_pause()
 
   currently_parsing_eof = (len == 0);
-  current_pause_parser = &s;
-  nparsed = http_parser_execute(parser, current_pause_parser, buf, len);
-  return nparsed;
+  current_pause_parser = s
+  nparsed = parser!.execute(current_pause_parser!, buf, len)
+  return nparsed
 }
-
+/*
 size_t parse_connect (const char *buf, size_t len)
 {
   size_t nparsed;
@@ -2421,39 +2336,38 @@ do {                                                                 \
                                                                      \
   check_str_eq(expected, #prop, expected->prop, ubuf);               \
 } while(0)
-
-int
-message_eq (int index, int connect, const struct message *expected)
+*/
+func message_eq (_ index: Int, _ connect: Int, _ expected: message) -> Bool
 {
-  int i;
-  struct message *m = &messages[index];
+  let m = messages[index]
+  let r = message_results[index]
 
-  MESSAGE_CHECK_NUM_EQ(expected, m, http_major);
-  MESSAGE_CHECK_NUM_EQ(expected, m, http_minor);
+  XCTAssertEqual(expected.http_major, m.http_major)
+  XCTAssertEqual(expected.http_minor, m.http_minor)
 
-  if (expected->type == HTTP_REQUEST) {
-    MESSAGE_CHECK_NUM_EQ(expected, m, method);
+  if (expected.type == .HTTP_REQUEST) {
+    XCTAssertEqual(expected.method, m.method)
   } else {
-    MESSAGE_CHECK_NUM_EQ(expected, m, status_code);
-    MESSAGE_CHECK_STR_EQ(expected, m, response_status);
+    //XCTAssertEqual(expected.status_code, m.status_code)
+    //XCTAssertEqual(expected.response_status, m.response_status)
   }
 
-  if (!connect) {
-    MESSAGE_CHECK_NUM_EQ(expected, m, should_keep_alive);
-    MESSAGE_CHECK_NUM_EQ(expected, m, message_complete_on_eof);
+  if (connect == 0) {
+    XCTAssertEqual(expected.should_keep_alive, m.should_keep_alive);
+    XCTAssertEqual(expected.should_keep_alive, m.should_keep_alive);
   }
 
-  assert(m->message_begin_cb_called);
-  assert(m->headers_complete_cb_called);
-  assert(m->message_complete_cb_called);
+  XCTAssertTrue(r.message_begin_cb_called)
+  XCTAssertTrue(r.headers_complete_cb_called)
+  XCTAssertTrue(r.message_complete_cb_called)
 
 
-  MESSAGE_CHECK_STR_EQ(expected, m, request_url);
+  XCTAssertEqual(expected.request_url, m.request_url)
 
   /* Check URL components; we can't do this w/ CONNECT since it doesn't
    * send us a well-formed URL.
    */
-  if (*m->request_url && m->method != HTTP_CONNECT) {
+  /*if (*m->request_url && m->method != HTTP_CONNECT) {
     struct http_parser_url u;
 
     if (http_parser_parse_url(m->request_url, strlen(m->request_url), 0, &u)) {
@@ -2477,41 +2391,38 @@ message_eq (int index, int connect, const struct message *expected)
     MESSAGE_CHECK_URL_EQ(&u, expected, m, fragment, UF_FRAGMENT);
     MESSAGE_CHECK_URL_EQ(&u, expected, m, request_path, UF_PATH);
     MESSAGE_CHECK_NUM_EQ(expected, m, port);
-  }
+  }*/
 
-  if (connect) {
-    check_num_eq(m, "body_size", 0, m->body_size);
-  } else if (expected->body_size) {
-    MESSAGE_CHECK_NUM_EQ(expected, m, body_size);
+  if (connect != 0) {
+    //XCTAssertEqual(0, m.body_size)
+  } /*else if (expected.body_size != 0) {
+    XCTAssertEqual(expected.body_size, m.body_size)
   } else {
-    MESSAGE_CHECK_STR_EQ(expected, m, body);
-  }
+    XCTAssertEqual(expected.body, m.body)
+  }*/
 
-  if (connect) {
-    check_num_eq(m, "num_chunks_complete", 0, m->num_chunks_complete);
+  /*if (connect) {
+    XCTAssertEqual(0, m.num_chunks_complete)
   } else {
-    assert(m->num_chunks == m->num_chunks_complete);
-    MESSAGE_CHECK_NUM_EQ(expected, m, num_chunks_complete);
-    for (i = 0; i < m->num_chunks && i < MAX_CHUNKS; i++) {
-      MESSAGE_CHECK_NUM_EQ(expected, m, chunk_lengths[i]);
+    XCTAssertTrue(m.num_chunks == m.num_chunks_complete)
+    XCTAssertEqual(expected.num_chunks_complete, m.num_chunks_complete)
+    for i in 0..<m.num_chunks {
+      XCTAssertEqual(expected.chunk_lengths[i], m.chunk_lengths[i])
     }
+  }*/
+
+  XCTAssertEqual(expected.num_headers, m.num_headers)
+
+  for i in 0..<m.num_headers {
+    XCTAssertEqual(expected.headers[i][0], m.headers[i][0])
+    XCTAssertEqual(expected.headers[i][1], m.headers[i][1])
   }
 
-  MESSAGE_CHECK_NUM_EQ(expected, m, num_headers);
+  XCTAssertEqual(expected.upgrade, m.upgrade)
 
-  int r;
-  for (i = 0; i < m->num_headers; i++) {
-    r = check_str_eq(expected, "header field", expected->headers[i][0], m->headers[i][0]);
-    if (!r) return 0;
-    r = check_str_eq(expected, "header value", expected->headers[i][1], m->headers[i][1]);
-    if (!r) return 0;
-  }
-
-  MESSAGE_CHECK_STR_EQ(expected, m, upgrade);
-
-  return 1;
+  return true
 }
-
+/*
 /* Given a sequence of varargs messages, return the number of them that the
  * parser should successfully parse, taking into account that upgraded
  * messages prevent all subsequent messages from being parsed.
@@ -2575,14 +2486,12 @@ upgrade_message_fix(char *body, const size_t nread, const size_t nmsgs, ...) {
 
   abort();
 }
-
-static void
-print_error (const char *raw, size_t error_location)
+*/
+func print_error (_ raw: String, _ error_location: Int)
 {
-  fprintf(stderr, "\n*** %s ***\n\n",
-          http_errno_description(HTTP_PARSER_ERRNO(parser)));
+  print("\n*** \(http_parser.errno_description(HTTP_PARSER_ERRNO(parser))) ***\n\n")
 
-  int this_line = 0, char_len = 0;
+  /*int this_line = 0, char_len = 0;
   size_t i, j, len = strlen(raw), error_location_line = 0;
   for (i = 0; i < len; i++) {
     if (i == error_location) this_line = 1;
@@ -2614,9 +2523,10 @@ print_error (const char *raw, size_t error_location)
   for (j = 0; j < error_location_line; j++) {
     fputc(' ', stderr);
   }
-  fprintf(stderr, "^\n\nerror location: %u\n", (unsigned int)error_location);
+ */
+  print("^\n\nerror location: \(error_location)\n")
 }
-
+/*
 void
 test_preserve_data (void)
 {
@@ -3246,26 +3156,40 @@ test_method_str (void)
   assert(0 == strcmp("GET", http_method_str(HTTP_GET)));
   assert(0 == strcmp("<unknown>", http_method_str(1337)));
 }
+*/
 
-void
-test_message (const struct message *message)
+public enum goto: ErrorProtocol { case test }
+
+func characters(_ chars: [UInt8], start: Int, length: Int) -> String {
+  var result = ""
+  for x in start..<start+length {
+    result.append(UnicodeScalar(chars[x]))
+  }
+  return result
+}
+
+func test_message (_ message: message)
 {
-  size_t raw_len = strlen(message->raw);
-  size_t msg1len;
-  for (msg1len = 0; msg1len < raw_len; msg1len++) {
-    parser_init(message->type);
+  let raw_len:Int = message.raw.utf8.count
+  var msg1len:Int = 0
+  
+  let chars = Array(message.raw.utf8)
+  
+  while msg1len < raw_len {
+    parser_init(message.type)
 
-    size_t read;
-    const char *msg1 = message->raw;
-    const char *msg2 = msg1 + msg1len;
-    size_t msg2len = raw_len - msg1len;
+    var read = 0
+    let msg1 = characters(chars, start: 0, length: msg1len)
+    let msg2len = raw_len - msg1len
+    let msg2 = characters(chars, start: msg1len, length: msg2len)
+    do {
 
-    if (msg1len) {
-      read = parse(msg1, msg1len);
+    if (msg1len > 0) {
+      read = parse(string: msg1)
 
-      if (message->upgrade && parser->upgrade && num_messages > 0) {
-        messages[num_messages - 1].upgrade = msg1 + read;
-        goto test;
+      if (message.upgrade.isEmpty == false && parser!.upgrade && num_messages > 0) {
+        messages[num_messages - 1].upgrade = characters(chars, start: 0, length: read)
+        throw goto.test
       }
 
       if (read != msg1len) {
@@ -3275,38 +3199,43 @@ test_message (const struct message *message)
     }
 
 
-    read = parse(msg2, msg2len);
+    read = parse(string: msg2)
 
-    if (message->upgrade && parser->upgrade) {
-      messages[num_messages - 1].upgrade = msg2 + read;
-      goto test;
+    if (message.upgrade.isEmpty == false && parser!.upgrade) {
+      messages[num_messages - 1].upgrade = characters(chars, start: msg1len, length: read)
+      throw goto.test
     }
 
     if (read != msg2len) {
-      print_error(msg2, read);
-      abort();
+      print_error(msg2, read)
+      abort()
     }
 
-    read = parse(NULL, 0);
+    read = parse(string: "")
 
     if (read != 0) {
-      print_error(message->raw, read);
-      abort();
+      print_error(message.raw, read)
+      abort()
     }
+    throw goto.test
+    } // end of do
 
-  test:
+    catch {
 
     if (num_messages != 1) {
-      printf("\n*** num_messages != 1 after testing '%s' ***\n\n", message->name);
-      abort();
+      print("\n*** num_messages != 1 after testing '\(message.name)' ***\n\n");
+      abort()
     }
 
-    if(!message_eq(0, 0, message)) abort();
+    if(!message_eq(0, 0, message)) { abort() }
 
-    parser_free();
+    parser_free()
+    msg1len += 1
+
+    } // end of catch
   }
 }
-
+/*
 void
 test_message_count_body (const struct message *message)
 {
@@ -3349,9 +3278,9 @@ func test_simple (_ buf: String, _ err_expected: http_errno)
 
   var err: http_errno
 
-  parse(string: buf, buf.characters.count)
+  parse(string: buf)
   err = HTTP_PARSER_ERRNO(parser)
-  parse(string: "", 0)
+  parse(string: "")
 
   parser_free()
 
@@ -3841,60 +3770,67 @@ create_large_chunked_message (int body_size_in_kb, const char* headers)
 
   return buf;
 }
-
+*/
 /* Verify that we can pause parsing at any of the bytes in the
  * message and still get the result that we're expecting. */
-void
-test_message_pause (const struct message *msg)
+func test_message_pause (_ msg: message)
 {
-  char *buf = (char*) msg->raw;
-  size_t buflen = strlen(msg->raw);
-  size_t nread;
+  var buf = msg.raw
+  var buflen = Int(strlen(msg.raw))
+  var nread = 0
+  var buf_count = 0
 
-  parser_init(msg->type);
+  let chars = Array(msg.raw.utf8)
+
+  parser_init(msg.type)
 
   do {
-    nread = parse_pause(buf, buflen);
+  while(buflen > 0) {
+    nread = parse_pause(buf, buflen)
 
     // We can only set the upgrade buffer once we've gotten our message
     // completion callback.
-    if (messages[0].message_complete_cb_called &&
-        msg->upgrade &&
-        parser->upgrade) {
-      messages[0].upgrade = buf + nread;
-      goto test;
+    if (message_results[0].message_complete_cb_called &&
+        !msg.upgrade.isEmpty &&
+        parser!.upgrade) {
+      messages[0].upgrade = characters(chars, start: buf_count + nread, length: buf_count - nread)
+      throw goto.test
     }
 
     if (nread < buflen) {
 
       // Not much do to if we failed a strict-mode check
-      if (HTTP_PARSER_ERRNO(parser) == HPE_STRICT) {
+      if (HTTP_PARSER_ERRNO(parser) == .HPE_STRICT) {
         parser_free();
         return;
       }
 
-      assert (HTTP_PARSER_ERRNO(parser) == HPE_PAUSED);
+      XCTAssertEqual (HTTP_PARSER_ERRNO(parser), .HPE_PAUSED)
     }
-
-    buf += nread;
-    buflen -= nread;
-    http_parser_pause(parser, 0);
-  } while (buflen > 0);
-
-  nread = parse_pause(NULL, 0);
-  assert (nread == 0);
-
-test:
-  if (num_messages != 1) {
-    printf("\n*** num_messages != 1 after testing '%s' ***\n\n", msg->name);
-    abort();
+    buf_count += nread
+    buflen -= nread
+    buf = characters(chars, start: buf_count, length: buflen)
+    parser!.pause(false)
   }
 
-  if(!message_eq(0, 0, msg)) abort();
+  nread = parse_pause("", 0)
+  assert (nread == 0)
+  
+  throw goto.test
+  } // end of do
 
-  parser_free();
+  catch {
+  if (num_messages != 1) {
+    print("\n*** num_messages != 1 after testing '\(msg.name)' ***\n\n")
+    abort()
+  }
+
+  if(!message_eq(0, 0, msg)) { abort() }
+
+  parser_free()
+  }
 }
-
+/*
 /* Verify that body and next message won't be parsed in responses to CONNECT */
 void
 test_message_connect (const struct message *msg)
@@ -4193,45 +4129,45 @@ func testMain ()
 
   /* TODO sending junk and large headers gets rejected */
 
-/*
   /* check to make sure our predefined requests are okay */
-  for (i = 0; requests[i].name; i++) {
-    test_message(&requests[i]);
+  let requests = getRequests()
+  for request in requests {
+    test_message(request)
   }
 
-  for (i = 0; i < request_count; i++) {
-    test_message_pause(&requests[i]);
+  for request in requests {
+    test_message_pause(request)
   }
-
-  for (i = 0; i < request_count; i++) {
-    if (!requests[i].should_keep_alive) continue;
-    for (j = 0; j < request_count; j++) {
-      if (!requests[j].should_keep_alive) continue;
-      for (k = 0; k < request_count; k++) {
-        test_multiple3(&requests[i], &requests[j], &requests[k]);
+/*
+  for i in requests {
+    if (!i.should_keep_alive) { continue }
+    for j in requests {
+      if (!j.should_keep_alive) { continue }
+      for k in requests {
+        test_multiple3(i, j, k);
       }
     }
   }
 
-  printf("request scan 1/4      ");
+  print("request scan 1/4      ");
   test_scan( &requests[GET_NO_HEADERS_NO_BODY]
            , &requests[GET_ONE_HEADER_NO_BODY]
            , &requests[GET_NO_HEADERS_NO_BODY]
            );
 
-  printf("request scan 2/4      ");
+  print("request scan 2/4      ");
   test_scan( &requests[POST_CHUNKED_ALL_YOUR_BASE]
            , &requests[POST_IDENTITY_BODY_WORLD]
            , &requests[GET_FUNKY_CONTENT_LENGTH]
            );
 
-  printf("request scan 3/4      ");
+  print("request scan 3/4      ");
   test_scan( &requests[TWO_CHUNKS_MULT_ZERO_END]
            , &requests[CHUNKED_W_TRAILING_HEADERS]
            , &requests[CHUNKED_W_BULLSHIT_AFTER_LENGTH]
            );
 
-  printf("request scan 4/4      ");
+  print("request scan 4/4      ");
   test_scan( &requests[QUERY_URL_WITH_QUESTION_MARK_GET]
            , &requests[PREFIX_NEWLINE_GET ]
            , &requests[CONNECT_REQUEST]
