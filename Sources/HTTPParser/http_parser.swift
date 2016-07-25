@@ -34,7 +34,7 @@ import Foundation
 /* Match these versions with the 'C' implementation - https://github.com/nodejs/http-parser */
 private let HTTP_PARSER_VERSION_MAJOR = 2
 private let HTTP_PARSER_VERSION_MINOR = 7
-private let HTTP_PARSER_VERSION_PATCH = 0
+private let HTTP_PARSER_VERSION_PATCH = 1
 
 
 /* Maximum header size allowed. This was a macro in the 'C' version
@@ -367,10 +367,10 @@ private func CALLBACK_DATA_(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR:
       body_mark = nil
     }
   }
-    /* We either errored above or got paused; get out */
-    if UNLIKELY(http_errno != .HPE_OK) {
-        return true
-    }
+  /* We either errored above or got paused; get out */
+  if UNLIKELY(http_errno != .HPE_OK) {
+    return true
+  }
   return false
 }
 
@@ -1715,11 +1715,7 @@ public func execute (_ settings: http_parser_delegate,
                   || c != CONTENT_LENGTH[self.index]) {
                 self.header_state = .h_general
               } else if (self.index == CONTENT_LENGTH.count - 1) {
-                if ((self.flags & F_CONTENTLENGTH) == 0) {
-                  try SET_ERRNO(.HPE_UNEXPECTED_CONTENT_LENGTH)
-                }
                 self.header_state = .h_content_length
-                self.flags |= F_CONTENTLENGTH
               }
               break
 
@@ -1820,6 +1816,11 @@ public func execute (_ settings: http_parser_delegate,
               try SET_ERRNO(.HPE_INVALID_CONTENT_LENGTH)
             }
 
+            if ((self.flags & F_CONTENTLENGTH) != 0) {
+                try SET_ERRNO(.HPE_UNEXPECTED_CONTENT_LENGTH)
+            }
+
+            self.flags |= F_CONTENTLENGTH
             self.content_length = UInt64(ch) - UInt64(ASCII_0)
             break
 
