@@ -1,5 +1,9 @@
 import PackageDescription
 
 let package = Package(
-    name: "HTTPParser"
+    name: "HTTPParser",
+    targets: [
+        Target(name: "bench", dependencies: [.Target(name: "HTTPParser")]),
+        Target(name: "HTTPParser")
+    ]
 )
