@@ -176,7 +176,7 @@ private let F_SKIPBODY: http_flags              = 1 << 6
 private let F_CONTENTLENGTH: http_flags         = 1 << 7
 
 /* Map for errno-related constants */
-public enum http_errno: String, ErrorProtocol {
+public enum http_errno: String, Error {
   case HPE_OK                     // "success"
 
 /* Callback-related errors */
@@ -1851,6 +1851,7 @@ public func execute (_ settings: http_parser_delegate,
       case .s_header_value:
         let start: UnsafePointer<UInt8> = p
         var h_state = self.header_state
+        var continueParse = false
         while (p != data + len) {
           ch = p[0]
           if (ch == CR) {
@@ -1865,7 +1866,9 @@ public func execute (_ settings: http_parser_delegate,
             try COUNT_HEADER_SIZE(p - start)
             self.header_state = h_state
             if CALLBACK_DATA(p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
-            continue
+            // a continue here breaks out of the local while loop and not the master
+            continueParse = true
+            break
           }
 
           if (!lenient && !IS_HEADER_CHAR(ch)) {
@@ -1882,7 +1885,7 @@ public func execute (_ settings: http_parser_delegate,
               let p_cr = memchr(p, 13, limit) // 13=CR
               let p_lf = memchr(p, 10, limit) // 10=LF
               if (p_cr != nil) {
-                if (p_lf != nil && p_cr >= p_lf) {
+                if (p_lf != nil && p_cr! >= p_lf!) {
                   p = UnsafePointer<UInt8>(p_lf!)
                 } else {
                   p = UnsafePointer<UInt8>(p_cr!)
@@ -2020,6 +2023,9 @@ public func execute (_ settings: http_parser_delegate,
               break
           }
           p += 1
+        }
+        if continueParse {
+            continue
         }
         self.header_state = h_state
 
