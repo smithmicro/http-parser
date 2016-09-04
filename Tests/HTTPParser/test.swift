@@ -3142,11 +3142,11 @@ func test_method_str ()
 public enum goto: Error { case test }
 
 func characters(_ chars: [UInt8], start: Int, length: Int) -> String {
-  var result = ""
+  var bytes = [UInt8]()
   for x in start..<start+length {
-    result.append(UnicodeScalar(chars[x]))
+    bytes.append(chars[x])
   }
-  return result
+  return String(data: Data(bytes: bytes, count: bytes.count), encoding: .utf8) ?? ""
 }
 
 func test_message (_ message: message)

@@ -1886,12 +1886,12 @@ public func execute (_ settings: http_parser_delegate,
               let p_lf = memchr(p, 10, limit) // 10=LF
               if (p_cr != nil) {
                 if (p_lf != nil && p_cr! >= p_lf!) {
-                  p = UnsafePointer<UInt8>(p_lf!)
+                  p = UnsafePointer<UInt8>(p_lf!.assumingMemoryBound(to: UInt8.self))
                 } else {
-                  p = UnsafePointer<UInt8>(p_cr!)
+                  p = UnsafePointer<UInt8>(p_cr!.assumingMemoryBound(to: UInt8.self))
                 }
               } else if (UNLIKELY(p_lf != nil)) {
-                p = UnsafePointer<UInt8>(p_lf!)
+                p = UnsafePointer<UInt8>(p_lf!.assumingMemoryBound(to: UInt8.self))
               } else {
                 p = data + len
               }
