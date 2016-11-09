@@ -21,7 +21,7 @@
 
 import Foundation
 
-@testable import HTTPParserTestSuite
+@testable import HTTPParserTests
 import XCTest
 
 

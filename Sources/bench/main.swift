@@ -84,30 +84,18 @@ func bench(_ iter_count: Int, silent: Bool) -> Int {
     let settings = HTTPCallback()
     var rps = 0.0
 
-    #if os(Linux)
-        let start = NSDate()
-        let httpData = data.data(using: NSUTF8StringEncoding)!
+    let start = Date()
+    let httpData = data.data(using: .utf8)!
+    httpData.withUnsafeBytes {(bytes: UnsafePointer<UInt8>) -> Void in
+
         for _ in 0 ..< iter_count {
             var parsed = 0
             parser.reset(.HTTP_REQUEST)
 
-            parsed = parser.execute(settings, UnsafePointer<UInt8>(httpData.bytes), httpData.length)
-            assert(parsed == httpData.length)
+            parsed = parser.execute(settings, bytes, httpData.count)
+            assert(parsed == httpData.count)
         }
-    #else
-        let start = Date()
-        let httpData = data.data(using: String.Encoding.utf8)!
-        httpData.withUnsafeBytes {(bytes: UnsafePointer<UInt8>) -> Void in
-
-            for _ in 0 ..< iter_count {
-                var parsed = 0
-                parser.reset(.HTTP_REQUEST)
-
-                parsed = parser.execute(settings, bytes, httpData.count)
-                assert(parsed == httpData.count)
-            }
-        }
-    #endif
+    }
 
     if !silent {
         print("Benchmark result:");
