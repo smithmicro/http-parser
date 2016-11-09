@@ -78,8 +78,7 @@ API Changes
 Testing
 -----
 macOS
-* Install Xcode 8 Beta 2
-* Set Command Line Tools in Preferences/Locations to Xcode 8.0
+* Install Xcode 8.1
 * run 'swift build --clean'
 * run 'swift build'
 * run 'swift test'
@@ -93,10 +92,8 @@ To Do
 -----
 * Finish porting unit tests (test.swift)
 * Further Xcode Instruments Time Profiler review
-* Port recent http-parser changes (i.e. version 2.7.1)
-* Support Xcode Profiling via 'swift package generate-xcodeproj'
 
 
 URL Parsing
 -----
-The URL parsing code from http-parser was not ported since Swift 3 applications can rely on the native NSURL/URL class in Foundation.
+The URL parsing code from http-parser was not ported since Swift 3 applications can rely on the native URL class in Foundation.
