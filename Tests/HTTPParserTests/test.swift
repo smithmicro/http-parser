@@ -1821,14 +1821,14 @@ strlncpy(char *dst, size_t len, const char *src, size_t n)
 }
 */
 
-func callbackString(_ at: UnsafePointer<UInt8>, _ length: Int) -> String {
-  let data = Data(bytes: at, count: length)
-  return String(data: data, encoding: String.Encoding.utf8)!
+func callbackString(_ at: UnsafePointer<UInt8>, _ length: Int) -> UnsafeBufferPointer<UInt8> {
+    return UnsafeBufferPointer(start: at, count: length)
 }
 
 func request_url_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  messages[num_messages].request_url += callbackString(buf, len)
+  messages[num_messages].request_url += String(bytes: callbackString(buf, len),
+                                               encoding: .utf8)!
   return 0
 }
 
@@ -1844,7 +1844,8 @@ func header_field_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
     }
   }
 
-  messages[num_messages].headers[messages[num_messages].num_headers-1][0] += callbackString(buf, len)
+  messages[num_messages].headers[messages[num_messages].num_headers-1][0] +=
+  String(bytes: callbackString(buf, len), encoding: .utf8)!
 
   message_results[num_messages].last_header_element = .FIELD
 
@@ -1853,7 +1854,8 @@ func header_field_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 
 func header_value_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  messages[num_messages].headers[messages[num_messages].num_headers-1][1] += callbackString(buf, len)
+  messages[num_messages].headers[messages[num_messages].num_headers-1][1] +=
+      String(bytes: callbackString(buf, len), encoding: .utf8)!
 
   message_results[num_messages].last_header_element = .VALUE
 
@@ -1873,7 +1875,8 @@ func check_body_is_final ()
 
 func body_cb (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
-  messages[num_messages].body += callbackString(buf, len)
+  messages[num_messages].body += String(bytes: callbackString(buf, len),
+                                        encoding: .utf8)!
   message_results[num_messages].body_size += len
   check_body_is_final()
   //print("body_cb: \(messages[num_messages].body)")
@@ -1934,7 +1937,8 @@ func message_complete_cb () -> Int
 
 func response_status_cb (_ buf: UnsafePointer<UInt8>, _ length: Int) -> Int
 {
-  message_results[num_messages].response_status += callbackString(buf, length)
+  message_results[num_messages].response_status += String(bytes:
+  callbackString(buf, length), encoding: .utf8)!
   return 0
 }
 
@@ -2034,38 +2038,18 @@ func dontcall_chunk_complete_cb () -> Int
   return 0
 }
 
-class settings_dontcall : http_parser_delegate {
-  
-  func on_message_begin() -> Int {
-    return dontcall_message_begin_cb()
-  }
-  func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return dontcall_header_field_cb(at, length)
-  }
-  func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return dontcall_header_value_cb(at, length)
-  }
-  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return dontcall_request_url_cb(at, length)
-  }
-  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return dontcall_response_status_cb(at, length)
-  }
-  func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return dontcall_body_cb(at, length)
-  }
-  func on_headers_complete() -> Int {
-    return dontcall_headers_complete_cb()
-  }
-  func on_message_complete() -> Int {
-    return dontcall_message_complete_cb()
-  }
-  func on_chunk_header() -> Int {
-    return dontcall_chunk_header_cb()
-  }
-  func on_chunk_complete() -> Int {
-    return dontcall_chunk_complete_cb()
-  }
+func settings_dontcall() -> http_parser_delegate {
+    return http_parser_delegate(
+  on_message_begin: dontcall_message_begin_cb,
+  on_url: dontcall_request_url_cb,
+  on_status: dontcall_response_status_cb,
+  on_header_field: dontcall_header_field_cb,
+  on_header_value: dontcall_header_value_cb,
+  on_headers_complete: dontcall_headers_complete_cb,
+  on_body: dontcall_body_cb,
+  on_message_complete: dontcall_message_complete_cb,
+  on_chunk_header: dontcall_chunk_header_cb,
+  on_chunk_complete: dontcall_chunk_complete_cb)
 }
 
 /* These pause_* callbacks always pause the parser and just invoke the regular
@@ -2154,82 +2138,42 @@ func connect_message_complete_cb () -> Int
   return message_complete_cb()
 }
 
-class settings_pause : http_parser_delegate {
-
-  func on_message_begin() -> Int {
-    return pause_message_begin_cb()
-  }
-  func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return pause_header_field_cb(at, length)
-  }
-  func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return pause_header_value_cb(at, length)
-  }
-  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return pause_request_url_cb(at, length)
-  }
-  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return pause_response_status_cb(at, length)
-  }
-  func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return pause_body_cb(at, length)
-  }
-  func on_headers_complete() -> Int {
-    return pause_headers_complete_cb()
-  }
-  func on_message_complete() -> Int {
-    return pause_message_complete_cb()
-  }
-  func on_chunk_header() -> Int {
-    return pause_chunk_header_cb()
-  }
-  func on_chunk_complete() -> Int {
-    return pause_chunk_complete_cb()
-  }
+func settings_pause() -> http_parser_delegate {
+    return http_parser_delegate(
+  on_message_begin: pause_message_begin_cb,
+  on_url: pause_request_url_cb,
+  on_status: pause_response_status_cb,
+  on_header_field: pause_header_field_cb,
+  on_header_value: pause_header_value_cb,
+  on_headers_complete: pause_headers_complete_cb,
+  on_body: pause_body_cb,
+  on_message_complete: pause_message_complete_cb,
+  on_chunk_header: pause_chunk_header_cb,
+  on_chunk_complete: pause_chunk_complete_cb)
 }
 
-class settings : http_parser_delegate {
-
-  func on_message_begin() -> Int {
-    return message_begin_cb()
-  }
-  func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return header_field_cb(at, length)
-  }
-  func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return header_value_cb(at, length)
-  }
-  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return request_url_cb(at, length)
-  }
-  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return response_status_cb(at, length)
-  }
-  func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return body_cb(at, length)
-  }
-  func on_headers_complete() -> Int {
-    return headers_complete_cb()
-  }
-  func on_message_complete() -> Int {
-    return message_complete_cb()
-  }
-  func on_chunk_header() -> Int {
-    return chunk_header_cb()
-  }
-  func on_chunk_complete() -> Int {
-    return chunk_complete_cb()
-  }
+func settings() -> http_parser_delegate {
+    return http_parser_delegate(
+  on_message_begin: message_begin_cb,
+  on_url: request_url_cb,
+  on_status: response_status_cb,
+  on_header_field: header_field_cb,
+  on_header_value: header_value_cb,
+  on_headers_complete: headers_complete_cb,
+  on_body: body_cb,
+  on_message_complete: message_complete_cb,
+  on_chunk_header: chunk_header_cb,
+  on_chunk_complete: chunk_complete_cb)
 }
 /*
 static http_parser_settings settings_count_body =
   {.on_message_begin = message_begin_cb
-  ,.on_header_field = header_field_cb
-  ,.on_header_value = header_value_cb
   ,.on_url = request_url_cb
   ,.on_status = response_status_cb
-  ,.on_body = count_body_cb
+  ,.on_header_field = header_field_cb
+  ,.on_header_value = header_value_cb
   ,.on_headers_complete = headers_complete_cb
+  ,.on_body = count_body_cb
   ,.on_message_complete = message_complete_cb
   ,.on_chunk_header = chunk_header_cb
   ,.on_chunk_complete = chunk_complete_cb
@@ -2237,49 +2181,61 @@ static http_parser_settings settings_count_body =
 
 static http_parser_settings settings_connect =
   {.on_message_begin = message_begin_cb
-  ,.on_header_field = header_field_cb
-  ,.on_header_value = header_value_cb
   ,.on_url = request_url_cb
   ,.on_status = response_status_cb
-  ,.on_body = dontcall_body_cb
+  ,.on_header_field = header_field_cb
+  ,.on_header_value = header_value_cb
   ,.on_headers_complete = connect_headers_complete_cb
+  ,.on_body = dontcall_body_cb
   ,.on_message_complete = connect_message_complete_cb
   ,.on_chunk_header = chunk_header_cb
   ,.on_chunk_complete = chunk_complete_cb
   };
 */
 
-class settings_null : http_parser_delegate {
-  func on_message_begin() -> Int {
-    return 0
-  }
-  func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
-  }
-  func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
-  }
-  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
-  }
-  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
-  }
-  func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
-    return 0
-  }
-  func on_headers_complete() -> Int {
-    return 0
-  }
-  func on_message_complete() -> Int {
-    return 0
-  }
-  func on_chunk_header() -> Int {
-    return 0
-  }
-  func on_chunk_complete() -> Int {
-    return 0
-  }
+    func on_message_begin() -> Int {
+        return 0
+    }
+    func on_url(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
+        return 0
+    }
+    func on_status(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
+        return 0
+    }
+    func on_header_field(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
+        return 0
+    }
+    func on_header_value(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
+        return 0
+    }
+    func on_headers_complete() -> Int {
+        return 0
+    }
+    func on_body(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
+        return 0
+    }
+    func on_message_complete() -> Int {
+        return 0
+    }
+    func on_chunk_header() -> Int {
+        return 0
+    }
+    func on_chunk_complete() -> Int {
+        return 0
+    }
+func  settings_null() -> http_parser_delegate {
+    return   http_parser_delegate(
+    on_message_begin: on_message_begin,
+    on_url: on_url,
+    on_status: on_status,
+    on_header_field: on_header_field,
+    on_header_value: on_header_value,
+    on_headers_complete: on_headers_complete,
+    on_body: on_body,
+    on_message_complete: on_message_complete,
+    on_chunk_header: on_chunk_header,
+    on_chunk_complete: on_chunk_complete
+    )
 }
 
 
@@ -2307,7 +2263,8 @@ func parser_free ()
 func parse (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 {
   currently_parsing_eof = (len == 0)
-  let nparsed = parser!.execute(settings(), buf, len)
+  parser!.delegate = settings()
+  let nparsed = parser!.execute( buf, len)
   return nparsed
 }
 
@@ -2333,7 +2290,8 @@ func parse_pause (_ buf: UnsafePointer<UInt8>, _ len: Int) -> Int
 
   currently_parsing_eof = (len == 0);
   current_pause_parser = s
-  nparsed = parser!.execute(current_pause_parser!, buf, len)
+  parser!.delegate = current_pause_parser!
+  nparsed = parser!.execute( buf, len)
   return nparsed
 }
 /*
@@ -3135,7 +3093,12 @@ const struct url_test url_tests[] =
 */
 func test_method_str ()
 {
-  assert(0 == strcmp("GET", http_parser().method_str(.HTTP_GET)))
+    "GET".withCString { bytesInt8 in
+        http_parser.method_str(.HTTP_GET).utf8Start.withMemoryRebound(to:
+        Int8.self, capacity: 3) { getBytes in
+          assert(0 == strcmp(bytesInt8, getBytes))
+        }
+    }
 }
 
 
@@ -3425,17 +3388,19 @@ test_header_cr_no_lf_error (int req)
 */
 func test_header_overflow_error (_ req: http_parser_type)
 {
-  let parser = http_parser(t: req)
+  var parser = http_parser(t: req)
   var parsed = 0
   var buf = req == .HTTP_REQUEST ? "GET / HTTP/1.1\r\n" : "HTTP/1.0 200 OK\r\n";
-  parsed = parser.execute(settings_null(), buf, Int(strlen(buf)))
+  parser.delegate = settings_null()
+  parsed = parser.execute( buf, Int(strlen(buf)))
   assert(parsed == Int(strlen(buf)))
 
   buf = "header-key: header-value\r\n"
   let buflen = Int(strlen(buf))
 
   for _ in 0..<10000 {
-    parsed = parser.execute(settings_null(), buf, buflen)
+    parser.delegate = settings_null()
+    parsed = parser.execute(buf, buflen)
     if (parsed != buflen) {
       //fprintf(stderr, "error found on iter %d\n", i);
       assert(parser.http_errno == .HPE_HEADER_OVERFLOW)
@@ -3450,10 +3415,11 @@ func test_header_overflow_error (_ req: http_parser_type)
 
 func test_header_nread_value ()
 {
-  let parser = http_parser(t: .HTTP_REQUEST)
+  var parser = http_parser(t: .HTTP_REQUEST)
   var parsed = 0
   let buf = "GET / HTTP/1.1\r\nheader: value\nhdr: value\r\n"
-  parsed = parser.execute(settings_null(), buf, Int(strlen(buf)))
+  parser.delegate = settings_null()
+  parsed = parser.execute( buf, Int(strlen(buf)))
   XCTAssertEqual(parsed, Int(strlen(buf)))
   // private type
   //assert(parser.nread == strlen(buf))
@@ -3462,8 +3428,9 @@ func test_header_nread_value ()
 
 func test_content_length_overflow (_ buf: String, _ buflen: Int, _ expect_ok: Int)
 {
-  let parser = http_parser(t: .HTTP_RESPONSE)
-  let _ = parser.execute(settings_null(), buf, buflen);
+  var parser = http_parser(t: .HTTP_RESPONSE)
+    parser.delegate = settings_null()
+  let _ = parser.execute(buf, buflen);
 
   if (expect_ok != 0) {
     assert(parser.http_errno == .HPE_OK)
@@ -3509,25 +3476,28 @@ func test_chunk_content_length_overflow_error ()
 
 func test_no_overflow_long_body (_ req: http_parser_type, _ length: Int)
 {
-  let parser = http_parser(t: req)
+  var parser = http_parser(t: req)
   var parsed = 0
   let preamble = req == .HTTP_REQUEST ? "POST / HTTP/1.0" : "HTTP/1.0 200 OK"
   let buf1 = "\(preamble)\r\nConnection: Keep-Alive\r\nContent-Length: \(length)\r\n\r\n"
   let buf1len = Int(strlen(buf1))
-  parsed = parser.execute(settings_null(), buf1, buf1len)
+parser.delegate = settings_null()
+  parsed = parser.execute(buf1, buf1len)
   if (parsed != buf1len) {
     XCTFail()
   }
 
   for _ in 0..<length {
     let foo = "a"
-    parsed = parser.execute(settings_null(), foo, 1)
+parser.delegate = settings_null()
+    parsed = parser.execute(foo, 1)
     if (parsed != 1) {
       XCTFail()
     }
   }
 
-  parsed = parser.execute(settings_null(), buf1, buf1len)
+parser.delegate = settings_null()
+  parsed = parser.execute(buf1, buf1len)
   if (parsed != buf1len) {
     XCTFail()
   }

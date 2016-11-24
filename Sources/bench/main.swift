@@ -29,43 +29,28 @@
 import Foundation
 import HTTPParser
 
-let data =
-"POST /joyent/http-parser HTTP/1.1\r\n" +
-"Host: github.com\r\n" +
-"DNT: 1\r\n" +
-"Accept-Encoding: gzip, deflate, sdch\r\n" +
-"Accept-Language: ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4\r\n" +
-"User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) " +
-"AppleWebKit/537.36 (KHTML, like Gecko) " +
-"Chrome/39.0.2171.65 Safari/537.36\r\n" +
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9," +
-"image/webp,*/*;q=0.8\r\n" +
-"Referer: https://github.com/joyent/http-parser\r\n" +
-"Connection: keep-alive\r\n" +
-"Transfer-Encoding: chunked\r\n" +
-"Cache-Control: max-age=0\r\n\r\nb\r\nhello world\r\n0\r\n\r\n"
+let httpData : StaticString = "POST /joyent/http-parser HTTP/1.1\r\nHost: github.com\r\nDNT: 1\r\nAccept-Encoding: gzip, deflate, sdch\r\nAccept-Language: ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.65 Safari/537.36\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9, image/webp,*/*;q=0.8\r\nReferer: https://github.com/joyent/http-parser\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\nCache-Control: max-age=0\r\n\r\nb\r\nhello world\r\n0\r\n\r\n"
 
 
-class HTTPCallback: http_parser_delegate {
     func on_message_begin() -> Int {
         return 0
     }
-    func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    func on_url(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
         return 0
     }
-    func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    func on_status(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
         return 0
     }
-    func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    func on_header_field(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
         return 0
     }
-    func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    func on_header_value(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
         return 0
     }
     func on_headers_complete() -> Int {
         return 0
     }
-    func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int {
+    func on_body(_ at: UnsafePointer<UInt8>, _ length: Int) -> Int {
         return 0
     }
     func on_message_complete() -> Int {
@@ -77,23 +62,34 @@ class HTTPCallback: http_parser_delegate {
     func on_chunk_complete() -> Int {
         return 0
     }
-}
+let  HTTPCallback = http_parser_delegate(
+    on_message_begin: on_message_begin,
+    on_url: on_url,
+    on_status: on_status,
+    on_header_field: on_header_field,
+    on_header_value: on_header_value,
+    on_headers_complete: on_headers_complete,
+    on_body: on_body,
+    on_message_complete: on_message_complete,
+    on_chunk_header: on_chunk_header,
+    on_chunk_complete: on_chunk_complete
+    )
 
 func bench(_ iter_count: Int, silent: Bool) -> Int {
-    let parser = http_parser()
-    let settings = HTTPCallback()
+    var parser = http_parser()
+    parser.delegate = HTTPCallback
     var rps = 0.0
 
     let start = Date()
-    let httpData = data.data(using: .utf8)!
-    httpData.withUnsafeBytes {(bytes: UnsafePointer<UInt8>) -> Void in
+    httpData.withUTF8Buffer {(bytes: UnsafeBufferPointer<UInt8>) -> Void in
 
         for _ in 0 ..< iter_count {
             var parsed = 0
             parser.reset(.HTTP_REQUEST)
 
-            parsed = parser.execute(settings, bytes, httpData.count)
-            assert(parsed == httpData.count)
+            parser.delegate = HTTPCallback
+            parsed = parser.execute(bytes.baseAddress!, bytes.count)
+            assert(parsed == bytes.count)
         }
     }
 
