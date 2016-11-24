@@ -31,10 +31,122 @@
 
 import Foundation
 
+private let ASCII_NUL: UInt8 = 0            // NULL	(Null character)
+private let ASCII_TAB: UInt8 = 9            // HT	(Horizontal Tab)
+private let LF: UInt8 = 10                  // LF	(Line feed)
+private let ASCII_FF: UInt8 = 11            // FF	(Form feed)
+private let CR: UInt8 = 13                  // CR	(Carriage return)
+
+private let ASCII_SPACE: UInt8 = 32         // 		(space)
+private let ASCII_EXCLAMATION: UInt8 = 33   // !	(exclamation mark)
+private let ASCII_QUOTE: UInt8 = 34         // "	(Quotation mark)
+private let ASCII_POUND: UInt8 = 35         // #	(Number sign)
+private let ASCII_DOLLAR: UInt8 = 36        // $	(Dollar sign)
+private let ASCII_PERCENT: UInt8 = 37       // %	(Percent sign)
+private let ASCII_AMPERSAND: UInt8 = 38     // &	(Ampersand)
+private let ASCII_APOSTROPHE: UInt8 = 39    // '	(Apostrophe)
+private let ASCII_L_PARENTHESES: UInt8 = 40	// (	(round brackets or parentheses)
+private let ASCII_R_PARENTHESES: UInt8 = 41	// )	(round brackets or parentheses)
+private let ASCII_ASTERISK: UInt8 = 42      // *	(Asterisk)
+private let ASCII_PLUS: UInt8 = 43          // +	(Plus sign)
+private let ASCII_COMMA: UInt8 = 44         // ,	(Comma)
+private let ASCII_HYPHEN: UInt8 = 45        // -	(Hyphen)
+private let ASCII_DOT: UInt8 = 46           // .	(Full stop , dot)
+private let ASCII_SLASH: UInt8 = 47         // /	(Slash)
+private let ASCII_0: UInt8 = 48             // 0	(number zero)
+private let ASCII_1: UInt8 = 49             // 1	(number one)
+private let ASCII_2: UInt8 = 50             // 2	(number two)
+private let ASCII_3: UInt8 = 51             // 3	(number three)
+private let ASCII_4: UInt8 = 52             // 4	(number four)
+private let ASCII_5: UInt8 = 53             // 5	(number five)
+private let ASCII_6: UInt8 = 54             // 6	(number six)
+private let ASCII_7: UInt8 = 55             // 7	(number seven)
+private let ASCII_8: UInt8 = 56             // 8	(number eight)
+private let ASCII_9: UInt8 = 57             // 9	(number nine)
+private let ASCII_COLON: UInt8 = 58         // :	(Colon)
+private let ASCII_SEMICOLON: UInt8 = 59     // ;	(Semicolon)
+private let ASCII_LESS: UInt8 = 60          // <	(Less-than sign )
+private let ASCII_EQUAL: UInt8 = 61         // 	=	(Equals sign)
+private let ASCII_GREATER: UInt8 = 62       // >	(Greater-than sign ; Inequality)
+private let ASCII_QUESTION: UInt8 = 63      // ?	(Question mark)
+
+private let ASCII_AT: UInt8 = 64          	// @	(At sign)
+private let ASCII_A: UInt8 = 65             // A	(Capital A )
+private let ASCII_B: UInt8 = 66	            // B	(Capital B )
+private let ASCII_C: UInt8 = 67	            // C	(Capital C )
+private let ASCII_D: UInt8 = 68	            // D	(Capital D )
+private let ASCII_E: UInt8 = 69	            // E	(Capital E )
+private let ASCII_F: UInt8 = 70	            // F	(Capital F )
+private let ASCII_G: UInt8 = 71	            // G	(Capital G )
+private let ASCII_H: UInt8 = 72	            // H	(Capital H )
+private let ASCII_I: UInt8 = 73	            // I	(Capital I )
+private let ASCII_J: UInt8 = 74	            // J	(Capital J )
+private let ASCII_K: UInt8 = 75	            // K	(Capital K )
+private let ASCII_L: UInt8 = 76	            // L	(Capital L )
+private let ASCII_M: UInt8 = 77	            // M	(Capital M )
+private let ASCII_N: UInt8 = 78	            // N	(Capital N )
+private let ASCII_O: UInt8 = 79	            // O	(Capital O )
+private let ASCII_P: UInt8 = 80	            // P	(Capital P )
+private let ASCII_Q: UInt8 = 81	            // Q	(Capital Q )
+private let ASCII_R: UInt8 = 82	            // R	(Capital R )
+private let ASCII_S: UInt8 = 83	            // S	(Capital S )
+private let ASCII_T: UInt8 = 84	            // T	(Capital T )
+private let ASCII_U: UInt8 = 85	            // U	(Capital U )
+private let ASCII_V: UInt8 = 86	            // V	(Capital V )
+private let ASCII_W: UInt8 = 87	            // W	(Capital W )
+private let ASCII_X: UInt8 = 88	            // X	(Capital X )
+private let ASCII_Y: UInt8 = 89	            // Y	(Capital Y )
+private let ASCII_Z: UInt8 = 90	            // Z	(Capital Z )
+private let ASCII_L_BRACKET: UInt8 = 91     // [	(square brackets or box brackets)
+private let ASCII_BACKSLASH: UInt8 = 92     // \	(Backslash)
+private let ASCII_R_BRACKET: UInt8 = 93     // ]	(square brackets or box brackets)
+private let ASCII_CARET: UInt8 = 94         // ^	(Caret or circumflex accent)
+private let ASCII_UNDERSCORE: UInt8 = 95    // _	(underscore , understrike , underbar or low line)
+
+private let ASCII_ACCENT: UInt8 = 96        // `	(Grave accent)
+private let ASCII_a: UInt8 = 97             // a	(Lowercase  a )
+private let ASCII_b: UInt8 = 98             // b	(Lowercase  b )
+private let ASCII_c: UInt8 = 99             // c	(Lowercase  c )
+private let ASCII_d: UInt8 = 100            // d	(Lowercase  d )
+private let ASCII_e: UInt8 = 101	          // e	(Lowercase  e )
+private let ASCII_f: UInt8 = 102	          // f	(Lowercase  f )
+private let ASCII_g: UInt8 = 103	          // g	(Lowercase  g )
+private let ASCII_h: UInt8 = 104	          // h	(Lowercase  h )
+private let ASCII_i: UInt8 = 105	          // i	(Lowercase  i )
+private let ASCII_j: UInt8 = 106	          // j	(Lowercase  j )
+private let ASCII_k: UInt8 = 107	          // k	(Lowercase  k )
+private let ASCII_l: UInt8 = 108	          // l	(Lowercase  l )
+private let ASCII_m: UInt8 = 109	          // m	(Lowercase  m )
+private let ASCII_n: UInt8 = 110	          // n	(Lowercase  n )
+private let ASCII_o: UInt8 = 111	          // o	(Lowercase  o )
+private let ASCII_p: UInt8 = 112	          // p	(Lowercase  p )
+private let ASCII_q: UInt8 = 113	          // q	(Lowercase  q )
+private let ASCII_r: UInt8 = 114	          // r	(Lowercase  r )
+private let ASCII_s: UInt8 = 115	          // s	(Lowercase  s )
+private let ASCII_t: UInt8 = 116	          // t	(Lowercase  t )
+private let ASCII_u: UInt8 = 117	          // u	(Lowercase  u )
+private let ASCII_v: UInt8 = 118	          // v	(Lowercase  v )
+private let ASCII_w: UInt8 = 119	          // w	(Lowercase  w )
+private let ASCII_x: UInt8 = 120	          // x	(Lowercase  x )
+private let ASCII_y: UInt8 = 121	          // y	(Lowercase  y )
+private let ASCII_z: UInt8 = 122	          // z	(Lowercase  z )
+private let ASCII_L_BRACE: UInt8 = 123	    // {	(curly brackets or braces)
+private let ASCII_VBAT: UInt8 = 124         // |	(vertical-bar, vbar, vertical line or vertical slash)
+private let ASCII_R_BRACE: UInt8 = 125	    // }	(curly brackets or braces)
+private let ASCII_TILDE: UInt8 = 126        // ~	(Tilde ; swung dash)
+
+
+
 /* Match these versions with the 'C' implementation - https://github.com/nodejs/http-parser */
 private let HTTP_PARSER_VERSION_MAJOR = 2
 private let HTTP_PARSER_VERSION_MINOR = 7
 private let HTTP_PARSER_VERSION_PATCH = 1
+
+extension StaticString: Equatable {
+    public static func ==(lhs: StaticString, rhs: StaticString) -> Bool {
+        return lhs.utf8Start == rhs.utf8Start
+    }
+}
 
 
 /* Maximum header size allowed. This was a macro in the 'C' version
@@ -61,20 +173,44 @@ private let HTTP_MAX_HEADER_SIZE = 80*1024
  * many times for each string. E.G. you might get 10 callbacks for "on_url"
  * each providing just a few characters more data.
  */
-public protocol http_parser_delegate {
-  func on_message_begin() -> Int
-  func on_url(at: UnsafePointer<UInt8>, length: Int) -> Int
-  func on_status(at: UnsafePointer<UInt8>, length: Int) -> Int
-  func on_header_field(at: UnsafePointer<UInt8>, length: Int) -> Int
-  func on_header_value(at: UnsafePointer<UInt8>, length: Int) -> Int
-  func on_headers_complete() -> Int
-  func on_body(at: UnsafePointer<UInt8>, length: Int) -> Int
-  func on_message_complete() -> Int
+public struct http_parser_delegate {
+  let on_message_begin: () -> Int
+  let on_url: ( UnsafePointer<UInt8>, Int) -> Int
+  let on_status: ( UnsafePointer<UInt8>, Int) -> Int
+  let on_header_field: ( UnsafePointer<UInt8>, Int) -> Int
+  let on_header_value: ( UnsafePointer<UInt8>, Int) -> Int
+  let on_headers_complete: () -> Int
+  let on_body: ( UnsafePointer<UInt8>, Int) -> Int
+  let on_message_complete: () -> Int
   /* When on_chunk_header is called, the current chunk length is stored
    * in parser.content_length
    */
-  func on_chunk_header() -> Int
-  func on_chunk_complete() -> Int
+  let on_chunk_header: () -> Int
+  let on_chunk_complete: () -> Int
+
+  public init(on_message_begin: @escaping () -> Int,
+              on_url: @escaping ( UnsafePointer<UInt8>, Int) -> Int,
+              on_status: @escaping ( UnsafePointer<UInt8>, Int) -> Int,
+              on_header_field: @escaping ( UnsafePointer<UInt8>, Int) -> Int,
+              on_header_value: @escaping ( UnsafePointer<UInt8>, Int) -> Int,
+              on_headers_complete: @escaping () -> Int,
+              on_body: @escaping ( UnsafePointer<UInt8>, Int) -> Int,
+              on_message_complete: @escaping () -> Int,
+              on_chunk_header: @escaping () -> Int,
+              on_chunk_complete: @escaping () -> Int
+  ) {
+    self.on_message_begin = on_message_begin
+    self.on_url = on_url
+    self.on_status = on_status
+    self.on_header_field = on_header_field
+    self.on_header_value = on_header_value
+    self.on_headers_complete = on_headers_complete
+    self.on_body = on_body
+    self.on_message_complete = on_message_complete
+    self.on_chunk_header = on_chunk_header
+    self.on_chunk_complete = on_chunk_complete
+
+  }
 }
 
 /* Request Methods */
@@ -122,7 +258,7 @@ public enum http_method: Int {
 
   static var count: Int { return http_method.HTTP_UNLINK.rawValue + 1}
 
-  var string: String {
+  var string: StaticString {
     switch self {
     case .HTTP_DELETE: return "DELETE"
     case .HTTP_GET: return "GET"
@@ -176,7 +312,7 @@ private let F_SKIPBODY: http_flags              = 1 << 6
 private let F_CONTENTLENGTH: http_flags         = 1 << 7
 
 /* Map for errno-related constants */
-public enum http_errno: String, Error {
+public enum http_errno: StaticString, Error {
   case HPE_OK                     // "success"
 
 /* Callback-related errors */
@@ -215,7 +351,7 @@ public enum http_errno: String, Error {
   case HPE_PAUSED                 // "parser is paused"
   case HPE_UNKNOWN                // "an unknown error occurred"
 
-  var description: String {
+  var description: StaticString {
     switch self {
     case .HPE_OK:                     return "success"
     case .HPE_CB_message_begin:       return "the on_message_begin callback failed"
@@ -254,17 +390,18 @@ public enum http_errno: String, Error {
   }
 }
 
-public class http_parser {
+private func LIKELY(_ X: Bool) -> Bool { return X }
+private func UNLIKELY(_ X: Bool) -> Bool { return X }
+
+public struct http_parser {
 
 private let ULLONG_MAX:UInt64 = 18446744073709551615
 
-private func SET_ERRNO(_ e: http_errno) throws {
+private mutating func SET_ERRNO(_ e: http_errno) throws {
   http_errno = e
   throw http_errno
 }
 
-private func LIKELY(_ X: Bool) -> Bool { return X }
-private func UNLIKELY(_ X: Bool) -> Bool { return X }
 
 /* Set the mark FOR; non-destructive if mark is already set */
 private enum http_mark {
@@ -275,35 +412,27 @@ private enum http_notify {
   case message_complete, message_begin, chunk_header, chunk_complete
 }
 
-private func CALLBACK_NOTIFY(_ p_state: state, _ FOR: http_notify) -> Bool {
+private mutating func CALLBACK_NOTIFY(_ p_state: inout state, _ FOR: http_notify) -> Bool {
   assert(self.http_errno == .HPE_OK)
 
   self.state = p_state
   switch FOR {
   case .message_complete:
-    if let callback = delegate {
-      if (callback.on_message_complete() != 0) {
+      if (delegate!.on_message_complete() != 0) {
         self.http_errno = .HPE_CB_message_complete
       }
-    }
   case .message_begin:
-    if let callback = delegate {
-      if (callback.on_message_begin() != 0) {
+      if (delegate!.on_message_begin() != 0) {
         self.http_errno = .HPE_CB_message_begin
       }
-    }
   case .chunk_header:
-    if let callback = delegate {
-      if (callback.on_message_begin() != 0) {
+      if (delegate!.on_message_begin() != 0) {
         self.http_errno = .HPE_CB_chunk_header
       }
-    }
   case .chunk_complete:
-    if let callback = delegate {
-      if (callback.on_chunk_complete() != 0) {
+      if (delegate!.on_chunk_complete() != 0) {
         self.http_errno = .HPE_CB_chunk_complete
       }
-    }
   }
   /* We either errored above or got paused; get out */
   if UNLIKELY(http_errno != .HPE_OK) {
@@ -312,58 +441,48 @@ private func CALLBACK_NOTIFY(_ p_state: state, _ FOR: http_notify) -> Bool {
   return false
 }
 
-private func CALLBACK_DATA_(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark, _ LEN: Int) -> Bool {
+private mutating func CALLBACK_DATA_(_ p_state: inout state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark, _ LEN: Int) -> Bool {
   assert(self.http_errno == .HPE_OK)
 
   switch FOR {
   case .status:
     if let mark = status_mark {
-      if let callback = delegate {
         self.state = p_state
-        if (callback.on_status(at: mark, length: LEN) != 0) {
+        if (delegate!.on_status( mark, LEN) != 0) {
           self.http_errno = .HPE_CB_status
         }
-      }
       status_mark = nil
     }
   case .url:
     if let mark = url_mark {
-      if let callback = delegate {
         self.state = p_state
-        if (callback.on_url(at: mark, length: LEN) != 0) {
+        if (delegate!.on_url( mark, LEN) != 0) {
           self.http_errno = .HPE_CB_url
         }
-      }
       url_mark = nil
     }
   case .header_field:
     if let mark = header_field_mark {
-      if let callback = delegate {
         self.state = p_state
-        if (callback.on_header_field(at: mark, length: LEN) != 0) {
+        if (delegate!.on_header_field( mark, LEN) != 0) {
           self.http_errno = .HPE_CB_header_field
         }
-      }
       header_field_mark = nil
     }
   case .header_value:
     if let mark = header_value_mark {
-      if let callback = delegate {
         self.state = p_state
-        if (callback.on_header_value(at: mark, length: LEN) != 0) {
+        if (delegate!.on_header_value( mark, LEN) != 0) {
           self.http_errno = .HPE_CB_header_value
         }
-      }
       header_value_mark = nil
     }
   case .body:
     if let mark = body_mark {
-      if let callback = delegate {
         self.state = p_state
-        if (callback.on_body(at: mark, length: LEN) != 0) {
+        if (delegate!.on_body( mark, LEN) != 0) {
           self.http_errno = .HPE_CB_body
         }
-      }
       body_mark = nil
     }
   }
@@ -374,27 +493,27 @@ private func CALLBACK_DATA_(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR:
   return false
 }
 
-private func CALLBACK_DATA(_ p_state: state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark) -> Bool {
+private mutating func CALLBACK_DATA(_ p_state: inout state, _ p : UnsafePointer<UInt8>, _ FOR: http_mark) -> Bool {
   switch FOR {
   case .status:
     if let mark = status_mark {
-      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(&p_state, p, FOR, p - mark)
     }
   case .url:
     if let mark = url_mark {
-      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(&p_state, p, FOR, p - mark)
     }
   case .header_field:
     if let mark = header_field_mark {
-      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(&p_state, p, FOR, p - mark)
     }
   case .header_value:
     if let mark = header_value_mark {
-      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(&p_state, p, FOR, p - mark)
     }
   case .body:
     if let mark = body_mark {
-      return CALLBACK_DATA_(p_state, p, FOR, p - mark)
+      return CALLBACK_DATA_(&p_state, p, FOR, p - mark)
     }
   }
   return false
@@ -406,7 +525,7 @@ private var url_mark: UnsafePointer<UInt8>? = nil
 private var body_mark: UnsafePointer<UInt8>? = nil
 private var status_mark: UnsafePointer<UInt8>? = nil
 
-private func MARK(_ FOR: http_mark, _ p: UnsafePointer<UInt8>?) {
+private mutating func MARK(_ FOR: http_mark, _ p: UnsafePointer<UInt8>?) {
   switch FOR {
   case .status:
     if status_mark == nil {
@@ -443,7 +562,7 @@ private func MARK(_ FOR: http_mark, _ p: UnsafePointer<UInt8>?) {
  * day-to-day operation.
  */
 
-private func COUNT_HEADER_SIZE(_ V: Int) throws {
+private mutating func COUNT_HEADER_SIZE(_ V: Int) throws {
   nread += V
   if nread > HTTP_MAX_HEADER_SIZE {
     http_errno = .HPE_HEADER_OVERFLOW
@@ -451,8 +570,9 @@ private func COUNT_HEADER_SIZE(_ V: Int) throws {
   }
 }
 
-private class func stringToArray(string: String) -> [UInt8] {
-  return Array(string.utf8)
+private static func stringToArray(string: StaticString) -> UnsafeBufferPointer<UInt8> {
+  return UnsafeBufferPointer(start: string.utf8Start,
+                             count: string.utf8CodeUnitCount)
 }
 
 private let PROXY_CONNECTION = http_parser.stringToArray(string: "proxy-connection")
@@ -464,16 +584,18 @@ private let CHUNKED = http_parser.stringToArray(string: "chunked")
 private let KEEP_ALIVE = http_parser.stringToArray(string: "keep-alive")
 private let CLOSE = http_parser.stringToArray(string: "close")
 
-var http_method_string_array: [[UInt8]] = []
+let http_method_string_array: ContiguousArray<UnsafeBufferPointer<UInt8>>
 
-private func create_method_strings() {
+private static func create_method_strings() -> ContiguousArray<UnsafeBufferPointer<UInt8>>{
   // build a cached set of method arrays to be used in method_strings
+  var http_method_string_array: ContiguousArray<UnsafeBufferPointer<UInt8>> = []
   for method: Int in 0..<http_method.count {
     http_method_string_array.append(http_parser.stringToArray(string: http_method(rawValue: method)!.string))
   }
+  return http_method_string_array
 }
 
-private func method_strings(_ method: http_method) -> [UInt8] {
+private func method_strings(_ method: http_method) -> UnsafeBufferPointer<UInt8> {
   assert(http_method.count == http_method_string_array.count)
   return http_method_string_array[method.rawValue]
 }
@@ -613,7 +735,7 @@ private enum state: Int
   case s_message_done
 }
 
-private func PARSING_HEADER(_ s: state) -> Bool { return s.rawValue <= state.s_headers_done.rawValue }
+private func PARSING_HEADER(_ s: inout state) -> Bool { return s.rawValue <= state.s_headers_done.rawValue }
 
 private  enum header_states: Int
 { case h_general = 0
@@ -653,7 +775,7 @@ private var header_state: header_states /* enum header_state from http_parser.c 
 private var index: Int               /* index into current matcher */
 private var lenient_http_headers: Bool
 private var nread: Int               /* # bytes read in various scenarios */
-private var delegate: http_parser_delegate? = nil
+public var delegate: http_parser_delegate! = nil
 
 public var content_length: UInt64    /* # bytes in body (0 if no Content-Length header) */
 public var http_major: UInt16
@@ -686,117 +808,11 @@ public init(t: http_parser_type = .HTTP_REQUEST) {
   status_code = 0
   method = .HTTP_DELETE
   upgrade = false
-  create_method_strings()
+  http_method_string_array = http_parser.create_method_strings()
 }
 
 
 /* Macros for character classes; depends on strict-mode  */
-
-private let ASCII_NUL: UInt8 = 0            // NULL	(Null character)
-private let ASCII_TAB: UInt8 = 9            // HT	(Horizontal Tab)
-private let LF: UInt8 = 10                  // LF	(Line feed)
-private let ASCII_FF: UInt8 = 11            // FF	(Form feed)
-private let CR: UInt8 = 13                  // CR	(Carriage return)
-
-private let ASCII_SPACE: UInt8 = 32         // 		(space)
-private let ASCII_EXCLAMATION: UInt8 = 33   // !	(exclamation mark)
-private let ASCII_QUOTE: UInt8 = 34         // "	(Quotation mark)
-private let ASCII_POUND: UInt8 = 35         // #	(Number sign)
-private let ASCII_DOLLAR: UInt8 = 36        // $	(Dollar sign)
-private let ASCII_PERCENT: UInt8 = 37       // %	(Percent sign)
-private let ASCII_AMPERSAND: UInt8 = 38     // &	(Ampersand)
-private let ASCII_APOSTROPHE: UInt8 = 39    // '	(Apostrophe)
-private let ASCII_L_PARENTHESES: UInt8 = 40	// (	(round brackets or parentheses)
-private let ASCII_R_PARENTHESES: UInt8 = 41	// )	(round brackets or parentheses)
-private let ASCII_ASTERISK: UInt8 = 42      // *	(Asterisk)
-private let ASCII_PLUS: UInt8 = 43          // +	(Plus sign)
-private let ASCII_COMMA: UInt8 = 44         // ,	(Comma)
-private let ASCII_HYPHEN: UInt8 = 45        // -	(Hyphen)
-private let ASCII_DOT: UInt8 = 46           // .	(Full stop , dot)
-private let ASCII_SLASH: UInt8 = 47         // /	(Slash)
-private let ASCII_0: UInt8 = 48             // 0	(number zero)
-private let ASCII_1: UInt8 = 49             // 1	(number one)
-private let ASCII_2: UInt8 = 50             // 2	(number two)
-private let ASCII_3: UInt8 = 51             // 3	(number three)
-private let ASCII_4: UInt8 = 52             // 4	(number four)
-private let ASCII_5: UInt8 = 53             // 5	(number five)
-private let ASCII_6: UInt8 = 54             // 6	(number six)
-private let ASCII_7: UInt8 = 55             // 7	(number seven)
-private let ASCII_8: UInt8 = 56             // 8	(number eight)
-private let ASCII_9: UInt8 = 57             // 9	(number nine)
-private let ASCII_COLON: UInt8 = 58         // :	(Colon)
-private let ASCII_SEMICOLON: UInt8 = 59     // ;	(Semicolon)
-private let ASCII_LESS: UInt8 = 60          // <	(Less-than sign )
-private let ASCII_EQUAL: UInt8 = 61         // 	=	(Equals sign)
-private let ASCII_GREATER: UInt8 = 62       // >	(Greater-than sign ; Inequality)
-private let ASCII_QUESTION: UInt8 = 63      // ?	(Question mark)
-
-private let ASCII_AT: UInt8 = 64          	// @	(At sign)
-private let ASCII_A: UInt8 = 65             // A	(Capital A )
-private let ASCII_B: UInt8 = 66	            // B	(Capital B )
-private let ASCII_C: UInt8 = 67	            // C	(Capital C )
-private let ASCII_D: UInt8 = 68	            // D	(Capital D )
-private let ASCII_E: UInt8 = 69	            // E	(Capital E )
-private let ASCII_F: UInt8 = 70	            // F	(Capital F )
-private let ASCII_G: UInt8 = 71	            // G	(Capital G )
-private let ASCII_H: UInt8 = 72	            // H	(Capital H )
-private let ASCII_I: UInt8 = 73	            // I	(Capital I )
-private let ASCII_J: UInt8 = 74	            // J	(Capital J )
-private let ASCII_K: UInt8 = 75	            // K	(Capital K )
-private let ASCII_L: UInt8 = 76	            // L	(Capital L )
-private let ASCII_M: UInt8 = 77	            // M	(Capital M )
-private let ASCII_N: UInt8 = 78	            // N	(Capital N )
-private let ASCII_O: UInt8 = 79	            // O	(Capital O )
-private let ASCII_P: UInt8 = 80	            // P	(Capital P )
-private let ASCII_Q: UInt8 = 81	            // Q	(Capital Q )
-private let ASCII_R: UInt8 = 82	            // R	(Capital R )
-private let ASCII_S: UInt8 = 83	            // S	(Capital S )
-private let ASCII_T: UInt8 = 84	            // T	(Capital T )
-private let ASCII_U: UInt8 = 85	            // U	(Capital U )
-private let ASCII_V: UInt8 = 86	            // V	(Capital V )
-private let ASCII_W: UInt8 = 87	            // W	(Capital W )
-private let ASCII_X: UInt8 = 88	            // X	(Capital X )
-private let ASCII_Y: UInt8 = 89	            // Y	(Capital Y )
-private let ASCII_Z: UInt8 = 90	            // Z	(Capital Z )
-private let ASCII_L_BRACKET: UInt8 = 91     // [	(square brackets or box brackets)
-private let ASCII_BACKSLASH: UInt8 = 92     // \	(Backslash)
-private let ASCII_R_BRACKET: UInt8 = 93     // ]	(square brackets or box brackets)
-private let ASCII_CARET: UInt8 = 94         // ^	(Caret or circumflex accent)
-private let ASCII_UNDERSCORE: UInt8 = 95    // _	(underscore , understrike , underbar or low line)
-
-private let ASCII_ACCENT: UInt8 = 96        // `	(Grave accent)
-private let ASCII_a: UInt8 = 97             // a	(Lowercase  a )
-private let ASCII_b: UInt8 = 98             // b	(Lowercase  b )
-private let ASCII_c: UInt8 = 99             // c	(Lowercase  c )
-private let ASCII_d: UInt8 = 100            // d	(Lowercase  d )
-private let ASCII_e: UInt8 = 101	          // e	(Lowercase  e )
-private let ASCII_f: UInt8 = 102	          // f	(Lowercase  f )
-private let ASCII_g: UInt8 = 103	          // g	(Lowercase  g )
-private let ASCII_h: UInt8 = 104	          // h	(Lowercase  h )
-private let ASCII_i: UInt8 = 105	          // i	(Lowercase  i )
-private let ASCII_j: UInt8 = 106	          // j	(Lowercase  j )
-private let ASCII_k: UInt8 = 107	          // k	(Lowercase  k )
-private let ASCII_l: UInt8 = 108	          // l	(Lowercase  l )
-private let ASCII_m: UInt8 = 109	          // m	(Lowercase  m )
-private let ASCII_n: UInt8 = 110	          // n	(Lowercase  n )
-private let ASCII_o: UInt8 = 111	          // o	(Lowercase  o )
-private let ASCII_p: UInt8 = 112	          // p	(Lowercase  p )
-private let ASCII_q: UInt8 = 113	          // q	(Lowercase  q )
-private let ASCII_r: UInt8 = 114	          // r	(Lowercase  r )
-private let ASCII_s: UInt8 = 115	          // s	(Lowercase  s )
-private let ASCII_t: UInt8 = 116	          // t	(Lowercase  t )
-private let ASCII_u: UInt8 = 117	          // u	(Lowercase  u )
-private let ASCII_v: UInt8 = 118	          // v	(Lowercase  v )
-private let ASCII_w: UInt8 = 119	          // w	(Lowercase  w )
-private let ASCII_x: UInt8 = 120	          // x	(Lowercase  x )
-private let ASCII_y: UInt8 = 121	          // y	(Lowercase  y )
-private let ASCII_z: UInt8 = 122	          // z	(Lowercase  z )
-private let ASCII_L_BRACE: UInt8 = 123	    // {	(curly brackets or braces)
-private let ASCII_VBAT: UInt8 = 124         // |	(vertical-bar, vbar, vertical line or vertical slash)
-private let ASCII_R_BRACE: UInt8 = 125	    // }	(curly brackets or braces)
-private let ASCII_TILDE: UInt8 = 126        // ~	(Tilde ; swung dash)
-
-
 private func LOWER(_ c: UInt8) -> UInt8 {
   return c | 0x20
 }
@@ -845,7 +861,7 @@ private func IS_HEADER_CHAR(_ ch: UInt8) -> Bool {
   return (ch == CR || ch == LF || ch == 9 || (ch > 31 && ch != 127))
 }
 
-private func STRICT_TOKEN(_ c: UInt8) -> UInt8 {
+private mutating func STRICT_TOKEN(_ c: UInt8) -> UInt8 {
   return tokens[Int(c)]
 }
 
@@ -853,7 +869,7 @@ private func TOKEN(_ c: UInt8) -> UInt8 {
   return tokens[Int(c)]
 }
 
-private func STRICT_CHECK(_ cond: Bool) throws {
+private mutating func STRICT_CHECK(_ cond: Bool) throws {
   if (cond) {
     http_errno = .HPE_STRICT
     throw http_errno
@@ -1036,8 +1052,7 @@ private func parse_url_char(_ s: state, _ ch: UInt8) -> state
 
 /* Executes the parser. Returns number of parsed bytes. Sets
  * `parser->http_errno` on error. */
-public func execute (_ settings: http_parser_delegate,
-              _ data: UnsafePointer<UInt8>,
+public mutating func execute( _ data: UnsafePointer<UInt8>,
               _ len: Int) -> Int
 {
   var c, ch: UInt8
@@ -1046,7 +1061,6 @@ public func execute (_ settings: http_parser_delegate,
   var p_state = self.state
   let lenient = self.lenient_http_headers
 
-  delegate = settings
 
   /* We're in an error state. Don't bother doing anything. */
   if (self.http_errno != .HPE_OK) {
@@ -1059,7 +1073,7 @@ public func execute (_ settings: http_parser_delegate,
         /* Use of CALLBACK_NOTIFY() here would erroneously return 1 byte read if
          * we got paused.
          */
-        if CALLBACK_NOTIFY(p_state, .message_complete) { return p - data } // CALLBACK_NOTIFY_NOADVANCE
+        if CALLBACK_NOTIFY(&p_state, .message_complete) { return p - data } // CALLBACK_NOTIFY_NOADVANCE
         return 0
 
       case .s_dead,
@@ -1107,7 +1121,7 @@ public func execute (_ settings: http_parser_delegate,
   while (p != data + len) {
     ch = p[0]
 
-    if (PARSING_HEADER(p_state)) {
+    if (PARSING_HEADER(&p_state)) {
       try COUNT_HEADER_SIZE(1)
     }
 
@@ -1133,7 +1147,7 @@ public func execute (_ settings: http_parser_delegate,
         if (ch == ASCII_H) {
           p_state = .s_res_or_resp_H
 
-          if CALLBACK_NOTIFY(p_state, .message_begin) { return  p - data + 1 }
+          if CALLBACK_NOTIFY(&p_state, .message_begin) { return  p - data + 1 }
         } else {
           self.type = .HTTP_REQUEST
           p_state = .s_start_req
@@ -1175,7 +1189,7 @@ public func execute (_ settings: http_parser_delegate,
             try SET_ERRNO(.HPE_INVALID_CONSTANT)
         }
 
-        if CALLBACK_NOTIFY(p_state, .message_begin) { return  p - data + 1 }
+        if CALLBACK_NOTIFY(&p_state, .message_begin) { return  p - data + 1 }
         break
 
       case .s_res_H:
@@ -1317,13 +1331,13 @@ public func execute (_ settings: http_parser_delegate,
       case .s_res_status:
         if (ch == CR) {
           p_state = .s_res_line_almost_done
-          if CALLBACK_DATA(p_state, p, .status) { return p - data + 1 }
+          if CALLBACK_DATA(&p_state, p, .status) { return p - data + 1 }
           break
         }
 
         if (ch == LF) {
           p_state = .s_header_field_start
-          if CALLBACK_DATA(p_state, p, .status) { return p - data + 1 }
+          if CALLBACK_DATA(&p_state, p, .status) { return p - data + 1 }
           break
         }
 
@@ -1370,7 +1384,7 @@ public func execute (_ settings: http_parser_delegate,
         }
         p_state = .s_req_method
 
-        if CALLBACK_NOTIFY(p_state, .message_begin) { return  p - data + 1 }
+        if CALLBACK_NOTIFY(&p_state, .message_begin) { return  p - data + 1 }
 
         break
 
@@ -1469,7 +1483,7 @@ public func execute (_ settings: http_parser_delegate,
         switch (ch) {
           case ASCII_SPACE:
             p_state = .s_req_http_start
-            if CALLBACK_DATA(p_state, p, .url) { return p - data + 1 }
+            if CALLBACK_DATA(&p_state, p, .url) { return p - data + 1 }
             break
           case CR,
                LF:
@@ -1478,7 +1492,7 @@ public func execute (_ settings: http_parser_delegate,
             p_state = (ch == CR) ?
               .s_req_line_almost_done :
               .s_header_field_start
-            if CALLBACK_DATA(p_state, p, .url) { return p - data + 1 }
+            if CALLBACK_DATA(&p_state, p, .url) { return p - data + 1 }
             break
           default:
             p_state = parse_url_char(p_state, ch)
@@ -1766,7 +1780,7 @@ public func execute (_ settings: http_parser_delegate,
 
         if (ch == ASCII_COLON) {
           p_state = .s_header_value_discard_ws
-          if CALLBACK_DATA(p_state, p, .header_field) { return p - data + 1 }
+          if CALLBACK_DATA(&p_state, p, .header_field) { return p - data + 1 }
           break
         }
 
@@ -1857,7 +1871,7 @@ public func execute (_ settings: http_parser_delegate,
           if (ch == CR) {
             p_state = .s_header_almost_done
             self.header_state = h_state
-            if CALLBACK_DATA(p_state, p, .header_value) { return p - data + 1 }
+            if CALLBACK_DATA(&p_state, p, .header_value) { return p - data + 1 }
             break
           }
 
@@ -1865,7 +1879,7 @@ public func execute (_ settings: http_parser_delegate,
             p_state = .s_header_almost_done
             try COUNT_HEADER_SIZE(p - start)
             self.header_state = h_state
-            if CALLBACK_DATA(p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
+            if CALLBACK_DATA(&p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
             // a continue here breaks out of the local while loop and not the master
             continueParse = true
             break
@@ -2100,7 +2114,7 @@ public func execute (_ settings: http_parser_delegate,
           /* header value was empty */
           MARK(.header_value, p)
           p_state = .s_header_field_start
-          if CALLBACK_DATA(p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
+          if CALLBACK_DATA(&p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
           continue
         }
 
@@ -2110,7 +2124,7 @@ public func execute (_ settings: http_parser_delegate,
         if (self.flags & F_TRAILING) != 0 {
           /* End of a chunked request */
           p_state = .s_message_done
-          if CALLBACK_NOTIFY(p_state, .chunk_complete) { return p - data } // CALLBACK_NOTIFY_NOADVANCE
+          if CALLBACK_NOTIFY(&p_state, .chunk_complete) { return p - data } // CALLBACK_NOTIFY_NOADVANCE
           continue
         }
 
@@ -2138,7 +2152,6 @@ public func execute (_ settings: http_parser_delegate,
          * We'd like to use CALLBACK_NOTIFY_NOADVANCE() here but we cannot, so
          * we have to simulate it by handling a change in errno below.
          */
-        if (delegate != nil) {
           switch (delegate!.on_headers_complete()) {
             case 0:
               break
@@ -2156,7 +2169,6 @@ public func execute (_ settings: http_parser_delegate,
               self.state = p_state
               return(p - data) /* Error */
           }
-        }
 
         if (self.http_errno != .HPE_OK) {
           self.state = p_state
@@ -2178,14 +2190,14 @@ public func execute (_ settings: http_parser_delegate,
                                 (self.flags & F_SKIPBODY) != 0 || !hasBody)) {
           /* Exit, the rest of the message is in a different protocol. */
           p_state = NEW_MESSAGE()
-          if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
+          if CALLBACK_NOTIFY(&p_state, .message_complete) { return  p - data + 1 }
           self.state = p_state
           return((p - data) + 1)
         }
 
         if (self.flags & F_SKIPBODY) != 0 {
           p_state = NEW_MESSAGE()
-          if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
+          if CALLBACK_NOTIFY(&p_state, .message_complete) { return  p - data + 1 }
         } else if (self.flags & F_CHUNKED != 0) {
           /* chunked encoding - ignore Content-Length header */
           p_state = .s_chunk_size_start
@@ -2193,7 +2205,7 @@ public func execute (_ settings: http_parser_delegate,
           if (self.content_length == 0) {
             /* Content-Length header given but zero: Content-Length: 0\r\n */
             p_state = NEW_MESSAGE()
-            if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
+            if CALLBACK_NOTIFY(&p_state, .message_complete) { return  p - data + 1 }
           } else if (self.content_length != ULLONG_MAX) {
             /* Content-Length header given and non-zero */
             p_state = .s_body_identity
@@ -2201,7 +2213,7 @@ public func execute (_ settings: http_parser_delegate,
             if (!http_message_needs_eof()) {
               /* Assume content-length 0 - read the next */
               p_state = NEW_MESSAGE()
-              if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
+              if CALLBACK_NOTIFY(&p_state, .message_complete) { return  p - data + 1 }
             } else {
               /* Read body until EOF */
               p_state = .s_body_identity_eof
@@ -2239,7 +2251,7 @@ public func execute (_ settings: http_parser_delegate,
            * complete-on-length. It's not clear that this distinction is
            * important for applications, but let's keep it for now.
            */
-          if CALLBACK_DATA_(p_state, p, .body, p - body_mark! + 1) { return p - data }
+          if CALLBACK_DATA_(&p_state, p, .body, p - body_mark! + 1) { return p - data }
           continue
         }
 
@@ -2254,7 +2266,7 @@ public func execute (_ settings: http_parser_delegate,
 
       case .s_message_done:
         p_state = NEW_MESSAGE()
-        if CALLBACK_NOTIFY(p_state, .message_complete) { return  p - data + 1 }
+        if CALLBACK_NOTIFY(&p_state, .message_complete) { return  p - data + 1 }
         if (self.upgrade) {
           /* Exit, the rest of the message is in a different protocol. */
           self.state = p_state
@@ -2329,7 +2341,7 @@ public func execute (_ settings: http_parser_delegate,
         } else {
           p_state = .s_chunk_data
         }
-        if CALLBACK_NOTIFY(p_state, .chunk_header) { return  p - data + 1 }
+        if CALLBACK_NOTIFY(&p_state, .chunk_header) { return  p - data + 1 }
         break
 
       case .s_chunk_data:
@@ -2358,7 +2370,7 @@ public func execute (_ settings: http_parser_delegate,
         assert(self.content_length == 0)
         try STRICT_CHECK(ch != CR)
         p_state = .s_chunk_data_done
-        if CALLBACK_DATA(p_state, p, .body) { return p - data + 1 }
+        if CALLBACK_DATA(&p_state, p, .body) { return p - data + 1 }
         break
 
       case .s_chunk_data_done:
@@ -2366,7 +2378,7 @@ public func execute (_ settings: http_parser_delegate,
         try STRICT_CHECK(ch != LF)
         self.nread = 0
         p_state = .s_chunk_size_start
-        if CALLBACK_NOTIFY(p_state, .chunk_complete) { return  p - data + 1 }
+        if CALLBACK_NOTIFY(&p_state, .chunk_complete) { return  p - data + 1 }
         break
 
       // not needed since Swift will warn us of any unhandled state
@@ -2394,11 +2406,11 @@ public func execute (_ settings: http_parser_delegate,
           (body_mark != nil ? 1 : 0) +
           (status_mark != nil ? 1 : 0)) <= 1)
 
-  if CALLBACK_DATA(p_state, p, .header_field) { return p - data } // CALLBACK_DATA_NOADVANCE
-  if CALLBACK_DATA(p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
-  if CALLBACK_DATA(p_state, p, .url) { return p - data } // CALLBACK_DATA_NOADVANCE
-  if CALLBACK_DATA(p_state, p, .body) { return p - data } // CALLBACK_DATA_NOADVANCE
-  if CALLBACK_DATA(p_state, p, .status) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(&p_state, p, .header_field) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(&p_state, p, .header_value) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(&p_state, p, .url) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(&p_state, p, .body) { return p - data } // CALLBACK_DATA_NOADVANCE
+  if CALLBACK_DATA(&p_state, p, .status) { return p - data } // CALLBACK_DATA_NOADVANCE
 
   self.state = p_state
   return(len)
@@ -2462,13 +2474,13 @@ public func should_keep_alive() -> Bool
 
 
 /* Returns a string version of the HTTP method. */
-public func method_str(_ m: http_method) -> String
+public static func method_str(_ m: http_method) -> StaticString
 {
   return m.string
 }
 
 
-public func reset(_ t: http_parser_type)
+public mutating func reset(_ t: http_parser_type)
 {
   type = t
   self.state = (t == .HTTP_REQUEST ? .s_start_req : (t == .HTTP_RESPONSE ? .s_start_res : .s_start_req_or_res))
@@ -2489,17 +2501,17 @@ public func reset(_ t: http_parser_type)
 
 
 /* Return a string name of the given error */
-public class func errno_name(_ err: http_errno) -> String {
+public static func errno_name(_ err: http_errno) -> StaticString {
   return err.rawValue
 }
 
 /* Return a string description of the given error */
-public class func errno_description(_ err: http_errno) -> String {
+public static func errno_description(_ err: http_errno) -> StaticString {
   return err.description
 }
 
 /* Pause or un-pause the parser; a nonzero value pauses */
-public func pause(_ paused: Bool) {
+public mutating func pause(_ paused: Bool) {
   /* Users should only be pausing/unpausing a parser that is not in an error
    * state. In non-debug builds, there's not much that we can do about this
    * other than ignore it.
@@ -2527,7 +2539,7 @@ public func body_is_final() -> Bool {
  *   let patch = version & 255
  *   print("http_parser v\(major).\(minor).\(patch)")
  */
-public class func version() -> UInt {
+public static func version() -> UInt {
   return UInt(HTTP_PARSER_VERSION_MAJOR << 16 +
          HTTP_PARSER_VERSION_MINOR << 8 +
          HTTP_PARSER_VERSION_PATCH)
